@@ -63,10 +63,11 @@ def run_discord_bot():
 
     @tree.command(name='shutdown', description='Shuts down the bot', guild=discord.Object(id=GUILD_ID))
     async def quit_bot(interaction):
-        if interaction.user.id == BOT_OWNER_ID:
+        if interaction.user.id == int(BOT_OWNER_ID):
             db.commit()
             db.close()
             await interaction.response.send_message("Shutting down in 5 seconds", ephemeral=True)
+            print("Bot: Shutting down")
             await asyncio.sleep(5)
             await client.close()
         else:
@@ -224,12 +225,12 @@ def run_discord_bot():
 
     async def update_scores():
         while True:
-            await updaters.fetch_and_display_games(client, TODAYS_GAMES_CHANNEL_ID)
             await asyncio.sleep(300)  # Update every 5 minutes  
+            await updaters.fetch_and_display_games(client, int(TODAYS_GAMES_CHANNEL_ID))
 
     async def update_trades():
         while True:
-            await updaters.fetch_and_display_trades(client, TRANSACTION_CHANNEL_ID)
             await asyncio.sleep(600)  # Update every 10 minutes
+            await updaters.fetch_and_display_trades(client, int(TRANSACTION_CHANNEL_ID))
 
     client.run(TOKEN)
