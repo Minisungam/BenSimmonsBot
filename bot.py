@@ -198,7 +198,7 @@ def run_discord_bot():
         leaders = LeagueLeaders().get_data_frames()[0]
 
         # Limit the number of leaders to display (adjust as needed)
-        max_leaders = 15
+        max_leaders = 20
         leaders = leaders.head(max_leaders)
 
         # Create an embed to display the league leaders
