@@ -8,9 +8,10 @@ This is my very first python project, so it's a bit rough around the edges. I'm 
 - [x] /player_info (player_name) - Pulls general info about a specific player.
 - [x] /player_log (player_name) - Pulls the last 10 games of a player and displays their Points/Assists/Rebounds.
 - [x] /league_leaders - Displays the top 20 players, with their points and minutes played.
+- [x] /shutdown - Safely shuts down the bot. Only the user id specified in ".env" can do this.
 ### Recursive Functions
 - [x] Transactions - Will pull player transaction data from NBA.com and puts it into the selected channel.
-- [ ] Displays the current day's games and their scores, and keeps the message up to date. (UNTESTED)
+- [ ] Daily Scores - Displays the current day's games and their scores, and keeps the message up to date. (UNTESTED)
 
 ## Install
 `pip install -r requirements.txt`
