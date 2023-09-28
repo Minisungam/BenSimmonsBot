@@ -1,5 +1,7 @@
 # BenSimmonsBot
 A simple discord bot that will interact with NBA.com to pull stats and player information.
+
+This is my very first python project, so it's a bit rough around the edges. I'm sure there are better ways to do some of the things I've done, but I'm still learning. I'm open to any suggestions or feedback.
 ## Current features:
 ### Slash Commands
 - [x] /player_stats (player_name) - Pulls a players overall stats from the current season.
