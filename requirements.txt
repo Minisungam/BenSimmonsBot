@@ -2,3 +2,5 @@ discord.py==2.3.2
 beautifulsoup4==4.12.2
 nba-api==1.2.1
 selenium==4.13.0
+python-dotenv==1.0.0
+selenium-async 0.1.0

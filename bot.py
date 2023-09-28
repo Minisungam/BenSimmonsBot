@@ -4,11 +4,22 @@ import updaters
 import db
 import discord
 import asyncio
+import concurrent.futures
 from datetime import datetime
 from discord import app_commands
-from dotenv import load_dotenv
+import dotenv
 import nba_api.stats.static.players as players
 from nba_api.stats.endpoints import playercareerstats, playergamelog, commonplayerinfo, LeagueLeaders
+
+settings = {
+    "TOKEN": "",
+    "GUILD_ID": 0,
+    "BOT_OWNER_ID": 0,
+    "TRANSACTION_CHANNEL_ID": 0,
+    "TODAYS_GAMES_CHANNEL_ID": 0,
+    "DAILY_SCORE_ENABLED": False,
+    "TRANSACTIONS_ENABLED": False
+}
 
 async def send_message(message, user_message, is_private):
     try:
@@ -22,27 +33,58 @@ async def send_message(message, user_message, is_private):
         await message.channel.send("An error occurred. Please try again.")
 
 def run_discord_bot():
-    load_dotenv()
-    TOKEN = os.getenv('BOT_TOKEN')
-    GUILD_ID = os.getenv('GUILD_ID')
-    BOT_OWNER_ID = os.getenv('BOT_OWNER_ID')
-    TRANSACTION_CHANNEL_ID = os.getenv('TRANSACTION_CHANNEL_ID')
-    TODAYS_GAMES_CHANNEL_ID = os.getenv('TODAYS_GAMES_CHANNEL_ID')
+    # Load environment variables
+    dotenv_file = dotenv.find_dotenv()
+    dotenv.load_dotenv(dotenv_file)
+    try:
+        if os.getenv('BOT_TOKEN') == "":
+            raise Exception
+        else:
+            settings["TOKEN"]: str = os.getenv('BOT_TOKEN')
+        settings["GUILD_ID"]: int = int(os.getenv('GUILD_ID'))
+        settings["BOT_OWNER_ID"]: int = int(os.getenv('BOT_OWNER_ID'))
+        settings["TRANSACTION_CHANNEL_ID"]: int = int(os.getenv('TRANSACTION_CHANNEL_ID'))
+        settings["TODAYS_GAMES_CHANNEL_ID"]: int = int(os.getenv('TODAYS_GAMES_CHANNEL_ID'))
+    except:
+        print("Bot: Environment variables missing in .env file.")
+        return
+    try:
+        settings["DAILY_SCORE_ENABLED"] : bool = eval(os.getenv('DAILY_SCORE_ENABLED'))
+    except:
+        settings["DAILY_SCORE_ENABLED"] : bool = False
+        print("Bot: DAILY_SCORE_ENABLED setting incorrect in .env file, must be \"True\" or \"False\". Defaulting to False.")
+    try:
+        settings["TRANSACTIONS_ENABLED"]: bool = eval(os.getenv('TRANSACTIONS_ENABLED'))
+    except:
+        settings["TRANSACTIONS_ENABLED"]: bool = False
+        print("Bot: TRANSACTIONS_ENABLED setting incorrect in .env file, must be \"True\" or \"False\". Defaulting to False.")
+
+
+    # Bot setup
     intents = discord.Intents.default()
     intents.message_content = True
     client = discord.Client(intents=intents)
     tree = app_commands.CommandTree(client)
 
+    ############# Bot events #############
     @client.event
     async def on_ready():
         print(f'{client.user} has connected to Discord!')
-        client.loop.create_task(update_scores())
-        print("Bot: Started scores service")
-        client.loop.create_task(update_trades())
-        print("Bot: Started trades service")
+        if settings["DAILY_SCORE_ENABLED"] :
+            settings["DAILY_SCORE_ENABLED"]  = False
+            await start_update_scores()
+            print("Bot: Daily scores service started")
+        else:
+            print("Bot: Daily scores service disabled")
+        if settings["TRANSACTIONS_ENABLED"]:
+            settings["TRANSACTIONS_ENABLED"] = False
+            await start_update_trades()
+            print("Bot: Transactions service started")
+        else:
+            print("Bot: Transactions service disabled")
         await client.change_presence(activity=discord.Activity(type=discord.ActivityType.playing, name="badly, no 3s."))
         print("Bot: Presence set")
-        await tree.sync(guild=discord.Object(id=GUILD_ID))
+        await tree.sync(guild=discord.Object(id=settings["GUILD_ID"]))
         print("Bot: Commands synced")
 
     @client.event
@@ -61,9 +103,34 @@ def run_discord_bot():
         else:
             await send_message(message, message.content, True)
 
-    @tree.command(name='shutdown', description='Shuts down the bot', guild=discord.Object(id=GUILD_ID))
+    ############# Bot commands #############
+    @tree.command(name='daily_scores', description='Enables or disables the daily scores service.', guild=discord.Object(id=settings["GUILD_ID"]))
+    async def daily_scores(interaction, enable: bool):
+        if interaction.user.id == settings["BOT_OWNER_ID"]:
+            if enable is True:
+                response = start_update_scores()
+                await interaction.response.send_message(response, ephemeral=True)
+            else:
+                response = stop_update_scores()
+                await interaction.response.send_message(response, ephemeral=True)
+        else:
+            await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
+
+    @tree.command(name='transactions', description='Enables or disables the transactions service.', guild=discord.Object(id=settings["GUILD_ID"]))
+    async def transactions(interaction, enable: bool):
+        if interaction.user.id == settings["BOT_OWNER_ID"]:
+            if enable is True:
+                response = start_update_trades()
+                await interaction.response.send_message(response, ephemeral=True)
+            else:
+                response = stop_update_trades()
+                await interaction.response.send_message(response, ephemeral=True)
+        else:
+            await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
+
+    @tree.command(name='shutdown', description='Shuts down the bot', guild=discord.Object(id=settings["GUILD_ID"]))
     async def quit_bot(interaction):
-        if interaction.user.id == int(BOT_OWNER_ID):
+        if interaction.user.id == settings["BOT_OWNER_ID"]:
             db.commit()
             db.close()
             await interaction.response.send_message("Shutting down in 5 seconds", ephemeral=True)
@@ -73,7 +140,7 @@ def run_discord_bot():
         else:
             await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
 
-    @tree.command(name='player_stats', description='Gets the player\'s stats for the season.', guild=discord.Object(id=GUILD_ID))
+    @tree.command(name='player_stats', description='Gets the player\'s stats for the season.', guild=discord.Object(id=settings["GUILD_ID"]))
     async def player_stats(interaction, player_name: str):
         # Use the nba_api to search for a player
         player_info = players.find_players_by_full_name(player_name)
@@ -118,7 +185,7 @@ def run_discord_bot():
         else:
             await interaction.response.send_message(f"Player {player_name} not found.", ephemeral=True)
 
-    @tree.command(name='player_log', description='Show the player\'s performance of their last 10 games.', guild=discord.Object(id=GUILD_ID))
+    @tree.command(name='player_log', description='Show the player\'s performance of their last 10 games.', guild=discord.Object(id=settings["GUILD_ID"]))
     async def player_stats(interaction, player_name: str):
         # Use the nba_api to search for a player
         player_info = players.find_players_by_full_name(player_name)
@@ -152,7 +219,7 @@ def run_discord_bot():
         else:
             await interaction.response.send_message(f"Player {player_name} not found.", ephemeral=True)
 
-    @tree.command(name='player_info', description='Show the player\'s more general information.', guild=discord.Object(id=GUILD_ID))
+    @tree.command(name='player_info', description='Show the player\'s more general information.', guild=discord.Object(id=settings["GUILD_ID"]))
     async def player_stats(interaction, player_name: str):
         # Use the nba_api to search for a player
         player_id = players.find_players_by_full_name(player_name)
@@ -193,7 +260,7 @@ def run_discord_bot():
         else:
             await interaction.response.send_message(f"Player {player_name} not found.", ephemeral=True)
 
-    @tree.command(name='league_leaders', description='Get a list of the top 15 players.', guild=discord.Object(id=GUILD_ID))
+    @tree.command(name='league_leaders', description='Get a list of the top 15 players.', guild=discord.Object(id=settings["GUILD_ID"]))
     async def league_leaders(interaction):
         # Use the NBA API to fetch league leaders data
         leaders = LeagueLeaders().get_data_frames()[0]
@@ -223,14 +290,47 @@ def run_discord_bot():
         # Send the message
         await interaction.response.send_message(embed=embed, ephemeral=False)
 
-    async def update_scores():
-        while True:
-            await asyncio.sleep(300)  # Update every 5 minutes  
-            await updaters.fetch_and_display_games(client, int(TODAYS_GAMES_CHANNEL_ID))
+    ############# Bot services #############
+    async def start_update_scores():
+        if settings["DAILY_SCORE_ENABLED"]  is False:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                executor.submit(updaters.fetch_and_display_games(client, settings["TODAYS_GAMES_CHANNEL_ID"]))
+            print("Bot: Daily scores service started")
+            return("Daily scores service started")
+        else:
+            print("Bot: Daily scores service already running")
+            return("Daily scores service already running")
+            
+    async def stop_update_scores():
+        if settings["DAILY_SCORE_ENABLED"]  is True:
+            settings["DAILY_SCORE_ENABLED"]  = False
+            os.environ["DAILY_SCORE_ENABLED"] = "False"
+            dotenv.set_key(dotenv_file, "DAILY_SCORE_ENABLED", "False")
+            print("Bot: Daily scores service stopped")
+            return("Daily scores service stopped")
+        else:
+            print("Bot: Daily scores service already stopped")
+            return("Daily scores service already stopped")
 
-    async def update_trades():
-        while True:
-            await asyncio.sleep(600)  # Update every 10 minutes
-            await updaters.fetch_and_display_trades(client, int(TRANSACTION_CHANNEL_ID))
+    async def start_update_trades():
+        if settings["TRANSACTIONS_ENABLED"] is False:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                executor.submit(updaters.fetch_and_display_trades(client, settings["TRANSACTION_CHANNEL_ID"]))
+            print("Bot: Transactions service started")
+            return("Transactions service started")
+        else:
+            print("Bot: Transactions service already running")
+            return("Transactions service already running")
 
-    client.run(TOKEN)
+    async def stop_update_trades():
+        if settings["TRANSACTIONS_ENABLED"] is True:
+            settings["TRANSACTIONS_ENABLED"] = False
+            os.environ["TRANSACTIONS_ENABLED"] = "False"
+            dotenv.set_key(dotenv_file, "TRANSACTIONS_ENABLED", "False")
+            print("Bot: Transactions service stopped")
+            return("Transactions service stopped")
+        else:
+            print("Bot: Transactions service already stopped")
+            return("Transactions service already stopped")
+
+    client.run(settings["TOKEN"])
