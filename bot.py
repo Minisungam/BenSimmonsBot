@@ -1,6 +1,6 @@
 import os
 import responses
-import updaters
+from updaters import fetch_and_display_games, fetch_and_display_trades
 import db
 import discord
 import asyncio
@@ -16,8 +16,12 @@ settings = {
     "BOT_OWNER_ID": 0,
     "TRANSACTION_CHANNEL_ID": 0,
     "TODAYS_GAMES_CHANNEL_ID": 0,
+    "DEBUG_CHANNEL_ID": 0,
     "DAILY_SCORE_ENABLED": False,
-    "TRANSACTIONS_ENABLED": False
+    "DAILY_SCORE_RUNNING": False,
+    "TRANSACTIONS_ENABLED": False,
+    "TRANSACTIONS_RUNNING": False
+    
 }
 
 def current_time():
@@ -49,6 +53,7 @@ def run_discord_bot():
         settings["BOT_OWNER_ID"]: int = int(os.getenv('BOT_OWNER_ID'))
         settings["TRANSACTION_CHANNEL_ID"]: int = int(os.getenv('TRANSACTION_CHANNEL_ID'))
         settings["TODAYS_GAMES_CHANNEL_ID"]: int = int(os.getenv('TODAYS_GAMES_CHANNEL_ID'))
+        settings["DEBUG_CHANNEL_ID"]: int = int(os.getenv('DEBUG_CHANNEL_ID'))
     except:
         print(f"[{current_time()}] Bot: Environment variables missing in .env file.")
         return
@@ -73,12 +78,15 @@ def run_discord_bot():
     ############# Bot events #############
     @client.event
     async def on_ready():
+        global transactions_service
+        global daily_scores_service
+
         print(f'{client.user} has connected to Discord!')
         # Daily Scores
-        client.loop.create_task(updaters.fetch_and_display_games(client, settings["TODAYS_GAMES_CHANNEL_ID"]))
+        client.loop.create_task(fetch_and_display_games(client))
         print(f"[{current_time()}] Bot: Daily scores service started") if settings["DAILY_SCORE_ENABLED"] else print(f"[{current_time()}] Bot: Daily scores service disabled")       
         # Transactions
-        client.loop.create_task(updaters.fetch_and_display_trades(client, settings["TRANSACTION_CHANNEL_ID"]))
+        client.loop.create_task(fetch_and_display_trades(client))
         print(f"[{current_time()}] Bot: Transactions service started") if settings["TRANSACTIONS_ENABLED"] else print(f"[{current_time()}] Bot: Transactions service disabled")
 
         await client.change_presence(activity=discord.Activity(type=discord.ActivityType.playing, name="badly, no 3s."))
@@ -294,12 +302,15 @@ def run_discord_bot():
     ############# Bot services #############
     async def start_update_scores():
         if settings["DAILY_SCORE_ENABLED"]  is False:
-            settings["DAILY_SCORE_ENABLED"]  = True
-            os.environ["DAILY_SCORE_ENABLED"] = "True"
-            dotenv.set_key(dotenv_file, "DAILY_SCORE_ENABLED", "True")
-            client.loop.create_task(updaters.fetch_and_display_games(client, settings["TODAYS_GAMES_CHANNEL_ID"]))
-            print(f"[{current_time()}] Bot: Daily scores service started")
-            return("Daily scores service started")
+            if settings["DAILY_SCORE_RUNNING"] is False:
+                settings["DAILY_SCORE_ENABLED"]  = True
+                os.environ["DAILY_SCORE_ENABLED"] = "True"
+                dotenv.set_key(dotenv_file, "DAILY_SCORE_ENABLED", "True")
+                client.loop.create_task(fetch_and_display_games(client))
+                print(f"[{current_time()}] Bot: Daily scores service started")
+                return("Daily scores service started")
+            else:
+                return("Daily scores service was recently shut down, please try again in a few minutes")
         else:
             print(f"[{current_time()}] Bot: Daily scores service already running")
             return("Daily scores service already running")
@@ -317,12 +328,15 @@ def run_discord_bot():
 
     async def start_update_trades():
         if settings["TRANSACTIONS_ENABLED"] is False:
-            settings["TRANSACTIONS_ENABLED"] = True
-            os.environ["TRANSACTIONS_ENABLED"] = "True"
-            dotenv.set_key(dotenv_file, "TRANSACTIONS_ENABLED", "True")
-            client.loop.create_task(updaters.fetch_and_display_trades(client, settings["TRANSACTION_CHANNEL_ID"]))
-            print(f"[{current_time()}] Bot: Transactions service started")
-            return("Transactions service started")
+            if settings["TRANSACTIONS_RUNNING"] is False:
+                settings["TRANSACTIONS_ENABLED"] = True
+                os.environ["TRANSACTIONS_ENABLED"] = "True"
+                dotenv.set_key(dotenv_file, "TRANSACTIONS_ENABLED", "True")
+                client.loop.create_task(fetch_and_display_trades(client))
+                print(f"[{current_time()}] Bot: Transactions service started")
+                return("Transactions service started")
+            else:
+                return("Transactions service was recently shut down, please try again in a few minutes")
         else:
             print(f"[{current_time()}] Bot: Transactions service already running")
             return("Transactions service already running")

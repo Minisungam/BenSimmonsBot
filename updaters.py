@@ -21,27 +21,33 @@ def run_fetch_trades(func: typing.Callable) -> typing.Coroutine:
 
 @run_fetch_trades
 def fetch_trades():
+    # Configure the Chrome driver
     options = webdriver.ChromeOptions()
     options.add_argument('--headless')
     options.add_experimental_option('excludeSwitches', ['enable-logging'])
 
+    # Create the driver
     driver = webdriver.Chrome(options=options)
     try:
         print(f"[{current_time()}] Trades: Created driver")
 
+        # Fetch the page source
         driver.get(nba_transactions_url)
         driver.implicitly_wait(30)
 
         return driver.page_source
     except (WebDriverException, TimeoutException) as e:
-        print(f"An error occurred while fetching trades: {str(e)}")
+        print(f"[{current_time()}] Trades: An error occurred while fetching trades: {str(e)}")
     finally:
+        # Close the driver
         driver.quit()
         print(f"[{current_time()}] Trades: Closed the driver")
 
-async def fetch_and_display_trades(client, CHANNEL_ID):
+async def fetch_and_display_trades(client):
+    bot.settings["TRANSACTIONS_RUNNING"] = True
     try:
-        while os.environ['TRANSACTIONS_ENABLED'] == "True":
+        while os.environ['TRANSACTIONS_ENABLED'] == "True":       
+
             page_source = await fetch_trades()
             print(f"[{current_time()}] Trades: Fetched page source")
 
@@ -75,8 +81,8 @@ async def fetch_and_display_trades(client, CHANNEL_ID):
                 # Check if the trade has been posted before
                 if trade_details not in posted_trades:
                     # Post the trade to Discord
-                    channel = client.get_channel(CHANNEL_ID)
-                    #await channel.send(embed=formatted_trade)
+                    transaction_channel = client.get_channel(bot.settings["TRANSACTIONS_CHANNEL_ID"])
+                    await transaction_channel.send(embed=formatted_trade)
                     await asyncio.sleep(1)
 
                     # Add the trade to the list of posted trades
@@ -88,15 +94,21 @@ async def fetch_and_display_trades(client, CHANNEL_ID):
             print(f"[{current_time()}] Trades: Skipped " + str(skipped) + ". Added " + str(added) + ".")
             db.commit()
 
-            await asyncio.sleep(600)  # Update every 10 minutes
+            print(f"[{current_time()}] Trades: Sleeping for 10 minutes")
+            await asyncio.sleep(600)
 
     except Exception as e:
         print(f"[{current_time()}] Trades: Error: {str(e)}")
     finally:
+        debug_channel = client.get_channel(bot.settings["DEBUG_CHANNEL_ID"])
+        await debug_channel.send("Trades service has stopped.")
+        bot.settings["TRANSACTIONS_ENABLED"] = False
+        bot.settings["TRANSACTIONS_RUNNING"] = False
         print(f"[{current_time()}] Trades: fully exited.")
 
 
-async def fetch_and_display_games(client, CHANNEL_ID):
+async def fetch_and_display_games(client):
+    bot.settings["DAILY_SCORE_RUNNING"] = True
     try:
         while os.environ['DAILY_SCORE_ENABLED'] == "True":
             # Fetch the list of games for the current day using NBA API
@@ -137,6 +149,10 @@ async def fetch_and_display_games(client, CHANNEL_ID):
             await asyncio.sleep(300)  # Update every 5 minutes
 
     except Exception:
-        print(f"[{current_time()}] Daily Score: Error intended, will be fixed once season starts)")
+        print(f"[{current_time()}] Daily Score: Error intended, will be fixed once season starts.")
     finally:
+        debug_channel = client.get_channel(bot.settings["DEBUG_CHANNEL_ID"])
+        await debug_channel.send("Daily score service has stopped.")
+        bot.settings["DAILY_SCORE_ENABLED"] = False
+        bot.settings["DAILY_SCORE_RUNNING"] = False
         print(f"[{current_time()}] Daily Score: Fully exited.")
