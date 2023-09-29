@@ -4,7 +4,6 @@ import updaters
 import db
 import discord
 import asyncio
-import concurrent.futures
 from datetime import datetime
 from discord import app_commands
 import dotenv
@@ -20,6 +19,11 @@ settings = {
     "DAILY_SCORE_ENABLED": False,
     "TRANSACTIONS_ENABLED": False
 }
+
+def current_time():
+    current_time = datetime.now()
+    formatted_time: str = current_time.strftime("%H:%M:%S")
+    return formatted_time
 
 async def send_message(message, user_message, is_private):
     try:
@@ -46,18 +50,18 @@ def run_discord_bot():
         settings["TRANSACTION_CHANNEL_ID"]: int = int(os.getenv('TRANSACTION_CHANNEL_ID'))
         settings["TODAYS_GAMES_CHANNEL_ID"]: int = int(os.getenv('TODAYS_GAMES_CHANNEL_ID'))
     except:
-        print("Bot: Environment variables missing in .env file.")
+        print(f"[{current_time()}] Bot: Environment variables missing in .env file.")
         return
     try:
         settings["DAILY_SCORE_ENABLED"] : bool = eval(os.getenv('DAILY_SCORE_ENABLED'))
     except:
         settings["DAILY_SCORE_ENABLED"] : bool = False
-        print("Bot: DAILY_SCORE_ENABLED setting incorrect in .env file, must be \"True\" or \"False\". Defaulting to False.")
+        print(f"[{current_time()}] Bot: DAILY_SCORE_ENABLED setting incorrect in .env file, must be \"True\" or \"False\". Defaulting to False.")
     try:
         settings["TRANSACTIONS_ENABLED"]: bool = eval(os.getenv('TRANSACTIONS_ENABLED'))
     except:
         settings["TRANSACTIONS_ENABLED"]: bool = False
-        print("Bot: TRANSACTIONS_ENABLED setting incorrect in .env file, must be \"True\" or \"False\". Defaulting to False.")
+        print(f"[{current_time()}] Bot: TRANSACTIONS_ENABLED setting incorrect in .env file, must be \"True\" or \"False\". Defaulting to False.")
 
 
     # Bot setup
@@ -70,22 +74,17 @@ def run_discord_bot():
     @client.event
     async def on_ready():
         print(f'{client.user} has connected to Discord!')
-        if settings["DAILY_SCORE_ENABLED"] :
-            settings["DAILY_SCORE_ENABLED"]  = False
-            await start_update_scores()
-            print("Bot: Daily scores service started")
-        else:
-            print("Bot: Daily scores service disabled")
-        if settings["TRANSACTIONS_ENABLED"]:
-            settings["TRANSACTIONS_ENABLED"] = False
-            await start_update_trades()
-            print("Bot: Transactions service started")
-        else:
-            print("Bot: Transactions service disabled")
+        # Daily Scores
+        client.loop.create_task(updaters.fetch_and_display_games(client, settings["TODAYS_GAMES_CHANNEL_ID"]))
+        print(f"[{current_time()}] Bot: Daily scores service started") if settings["DAILY_SCORE_ENABLED"] else print(f"[{current_time()}] Bot: Daily scores service disabled")       
+        # Transactions
+        client.loop.create_task(updaters.fetch_and_display_trades(client, settings["TRANSACTION_CHANNEL_ID"]))
+        print(f"[{current_time()}] Bot: Transactions service started") if settings["TRANSACTIONS_ENABLED"] else print(f"[{current_time()}] Bot: Transactions service disabled")
+
         await client.change_presence(activity=discord.Activity(type=discord.ActivityType.playing, name="badly, no 3s."))
-        print("Bot: Presence set")
+        print(f"[{current_time()}] Bot: Presence set")
         await tree.sync(guild=discord.Object(id=settings["GUILD_ID"]))
-        print("Bot: Commands synced")
+        print(f"[{current_time()}] Bot: Commands synced")
 
     @client.event
     async def on_message(message):
@@ -108,10 +107,10 @@ def run_discord_bot():
     async def daily_scores(interaction, enable: bool):
         if interaction.user.id == settings["BOT_OWNER_ID"]:
             if enable is True:
-                response = start_update_scores()
+                response = await start_update_scores()
                 await interaction.response.send_message(response, ephemeral=True)
             else:
-                response = stop_update_scores()
+                response = await stop_update_scores()
                 await interaction.response.send_message(response, ephemeral=True)
         else:
             await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
@@ -120,10 +119,10 @@ def run_discord_bot():
     async def transactions(interaction, enable: bool):
         if interaction.user.id == settings["BOT_OWNER_ID"]:
             if enable is True:
-                response = start_update_trades()
+                response = await start_update_trades()
                 await interaction.response.send_message(response, ephemeral=True)
             else:
-                response = stop_update_trades()
+                response = await stop_update_trades()
                 await interaction.response.send_message(response, ephemeral=True)
         else:
             await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
@@ -134,7 +133,7 @@ def run_discord_bot():
             db.commit()
             db.close()
             await interaction.response.send_message("Shutting down in 5 seconds", ephemeral=True)
-            print("Bot: Shutting down")
+            print(f"[{current_time()}] Bot: Shutting down")
             await asyncio.sleep(5)
             await client.close()
         else:
@@ -158,12 +157,14 @@ def run_discord_bot():
             embed.set_thumbnail(url=f"https://cdn.nba.com/headshots/nba/latest/260x190/{player_id}.png")
             embed.set_footer(text="Data provided by NBA.com", icon_url="https://pbs.twimg.com/profile_images/1692188312759341056/Eb9QQok7_200x200.jpg")
 
+            # Define a mapping for stat names to display names
             stat_name_mapping = {
                 'FG_PCT': ('FG%', True),
                 'FG3_PCT': ('FG3%', True),
                 'FT_PCT': ('FT%', True)
             }
 
+            # Define a list of stats to skip
             stats_to_skip = ['PLAYER_ID', 'SEASON_ID', 'LEAGUE_ID', 'TEAM_ID', 'TEAM_ABBREVIATION', 'PLAYER_AGE']
             
             # Add fields for each stat, using the display name from the mapping if available
@@ -293,12 +294,14 @@ def run_discord_bot():
     ############# Bot services #############
     async def start_update_scores():
         if settings["DAILY_SCORE_ENABLED"]  is False:
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                executor.submit(updaters.fetch_and_display_games(client, settings["TODAYS_GAMES_CHANNEL_ID"]))
-            print("Bot: Daily scores service started")
+            settings["DAILY_SCORE_ENABLED"]  = True
+            os.environ["DAILY_SCORE_ENABLED"] = "True"
+            dotenv.set_key(dotenv_file, "DAILY_SCORE_ENABLED", "True")
+            client.loop.create_task(updaters.fetch_and_display_games(client, settings["TODAYS_GAMES_CHANNEL_ID"]))
+            print(f"[{current_time()}] Bot: Daily scores service started")
             return("Daily scores service started")
         else:
-            print("Bot: Daily scores service already running")
+            print(f"[{current_time()}] Bot: Daily scores service already running")
             return("Daily scores service already running")
             
     async def stop_update_scores():
@@ -306,20 +309,22 @@ def run_discord_bot():
             settings["DAILY_SCORE_ENABLED"]  = False
             os.environ["DAILY_SCORE_ENABLED"] = "False"
             dotenv.set_key(dotenv_file, "DAILY_SCORE_ENABLED", "False")
-            print("Bot: Daily scores service stopped")
+            print(f"[{current_time()}] Bot: Daily scores service stopped")
             return("Daily scores service stopped")
         else:
-            print("Bot: Daily scores service already stopped")
+            print(f"[{current_time()}] Bot: Daily scores service already stopped")
             return("Daily scores service already stopped")
 
     async def start_update_trades():
         if settings["TRANSACTIONS_ENABLED"] is False:
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                executor.submit(updaters.fetch_and_display_trades(client, settings["TRANSACTION_CHANNEL_ID"]))
-            print("Bot: Transactions service started")
+            settings["TRANSACTIONS_ENABLED"] = True
+            os.environ["TRANSACTIONS_ENABLED"] = "True"
+            dotenv.set_key(dotenv_file, "TRANSACTIONS_ENABLED", "True")
+            client.loop.create_task(updaters.fetch_and_display_trades(client, settings["TRANSACTION_CHANNEL_ID"]))
+            print(f"[{current_time()}] Bot: Transactions service started")
             return("Transactions service started")
         else:
-            print("Bot: Transactions service already running")
+            print(f"[{current_time()}] Bot: Transactions service already running")
             return("Transactions service already running")
 
     async def stop_update_trades():
@@ -327,10 +332,10 @@ def run_discord_bot():
             settings["TRANSACTIONS_ENABLED"] = False
             os.environ["TRANSACTIONS_ENABLED"] = "False"
             dotenv.set_key(dotenv_file, "TRANSACTIONS_ENABLED", "False")
-            print("Bot: Transactions service stopped")
+            print(f"[{current_time()}] Bot: Transactions service stopped")
             return("Transactions service stopped")
         else:
-            print("Bot: Transactions service already stopped")
+            print(f"[{current_time()}] Bot: Transactions service already stopped")
             return("Transactions service already stopped")
 
     client.run(settings["TOKEN"])
