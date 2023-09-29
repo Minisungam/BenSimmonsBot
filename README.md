@@ -9,10 +9,15 @@ This is my very first python project, so it's a bit rough around the edges. I'm 
 - [x] /player_log (player_name) - Pulls the last 10 games of a player and displays their Points/Assists/Rebounds.
 - [x] /league_leaders - Displays the top 20 players, with their points and minutes played.
 - [x] /shutdown - Safely shuts down the bot. Only the user id specified in ".env" can do this.
+- [x] /transactions - Allows the user to enable or disable the transactions service.
+- [x] /daily_scores - Allows the user to enable or disable the daily scores service.
 ### Recursive Functions
 - [x] Transactions - Will pull player transaction data from NBA.com and puts it into the selected channel.
 - [ ] Daily Scores - Displays the current day's games and their scores, and keeps the message up to date. (UNTESTED)
-
+### Chat Commands
+- [x] !help - Displays a list of chat commands.
+- [x] !roll - Rolls a random number between 1 and 10.
+- [x] !abbreviations - Displays a list of NBA stat abbreviations.
 ## Install
 `pip install -r requirements.txt`
 

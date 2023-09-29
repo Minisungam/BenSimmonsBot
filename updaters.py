@@ -131,7 +131,7 @@ async def fetch_and_display_games(client):
                         await bot.game_message.edit(content=formatted_message)
                     else:
                         # If the message doesn't exist yet, send a new message
-                        bot.game_message = await client.get_channel(CHANNEL_ID).send(formatted_message)
+                        bot.game_message = await client.get_channel(bot.settings["TODAYS_GAMES_CHANNEL_ID"]).send(formatted_message)
                 except IndexError:
                     return
                 except Exception as e:
@@ -144,7 +144,7 @@ async def fetch_and_display_games(client):
                 if bot.game_message is not None:
                     await bot.game_message.edit(content=formatted_message)
                 else:
-                    game_message = await client.get_channel(CHANNEL_ID).send(formatted_message)
+                    game_message = await client.get_channel(bot.settings["TODAYS_GAMES_CHANNEL_ID"]).send(formatted_message)
 
             await asyncio.sleep(300)  # Update every 5 minutes
 
