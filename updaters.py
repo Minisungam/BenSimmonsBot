@@ -46,6 +46,8 @@ def fetch_trades():
 async def fetch_and_display_trades(client):
     bot.settings["TRANSACTIONS_RUNNING"] = True
     try:
+        debug_channel = client.get_channel(bot.settings["DEBUG_CHANNEL_ID"])
+
         while os.environ['TRANSACTIONS_ENABLED'] == "True":       
 
             page_source = await fetch_trades()
@@ -81,7 +83,7 @@ async def fetch_and_display_trades(client):
                 # Check if the trade has been posted before
                 if trade_details not in posted_trades:
                     # Post the trade to Discord
-                    transaction_channel = client.get_channel(bot.settings["TRANSACTIONS_CHANNEL_ID"])
+                    transaction_channel = client.get_channel(bot.settings["TRANSACTION_CHANNEL_ID"])
                     await transaction_channel.send(embed=formatted_trade)
                     await asyncio.sleep(1)
 
@@ -98,9 +100,9 @@ async def fetch_and_display_trades(client):
             await asyncio.sleep(600)
 
     except Exception as e:
+        await debug_channel.send(f"Trades error: ```{str(e)}```")
         print(f"[{current_time()}] Trades: Error: {str(e)}")
     finally:
-        debug_channel = client.get_channel(bot.settings["DEBUG_CHANNEL_ID"])
         await debug_channel.send("Trades service has stopped.")
         bot.settings["TRANSACTIONS_ENABLED"] = False
         bot.settings["TRANSACTIONS_RUNNING"] = False
@@ -110,6 +112,8 @@ async def fetch_and_display_trades(client):
 async def fetch_and_display_games(client):
     bot.settings["DAILY_SCORE_RUNNING"] = True
     try:
+        debug_channel = client.get_channel(bot.settings["DEBUG_CHANNEL_ID"])
+
         while os.environ['DAILY_SCORE_ENABLED'] == "True":
             # Fetch the list of games for the current day using NBA API
             today = date.today().strftime('%Y-%m-%d')
@@ -148,10 +152,10 @@ async def fetch_and_display_games(client):
 
             await asyncio.sleep(300)  # Update every 5 minutes
 
-    except Exception:
+    except Exception as e:
+        await debug_channel.send(f"Daily score error: ```{str(e)}```")
         print(f"[{current_time()}] Daily Score: Error intended, will be fixed once season starts.")
-    finally:
-        debug_channel = client.get_channel(bot.settings["DEBUG_CHANNEL_ID"])
+    finally:  
         await debug_channel.send("Daily score service has stopped.")
         bot.settings["DAILY_SCORE_ENABLED"] = False
         bot.settings["DAILY_SCORE_RUNNING"] = False
