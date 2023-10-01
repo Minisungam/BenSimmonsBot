@@ -151,17 +151,17 @@ def run_discord_bot():
     ])
     async def set_channels(interaction, choices: app_commands.Choice[str]):
         if interaction.user.id == settings["BOT_OWNER_ID"]:
-            if choices == "daily_scores":
+            if choices.value == "daily_scores":
                 settings["TODAYS_GAMES_CHANNEL_ID"] = interaction.channel_id
                 dotenv.set_key(dotenv_file, "TODAYS_GAMES_CHANNEL_ID", str(interaction.channel_id))
                 await interaction.response.send_message("Daily scores channel set.", ephemeral=True)
                 print(f"[{current_time()}] Bot: Daily scores channel set to {interaction.channel_id}.")
-            elif choices == "transactions":
+            elif choices.value == "transactions":
                 settings["TRANSACTION_CHANNEL_ID"] = interaction.channel_id
                 dotenv.set_key(dotenv_file, "TRANSACTION_CHANNEL_ID", str(interaction.channel_id))
                 await interaction.response.send_message("Transactions channel set.", ephemeral=True)
                 print(f"[{current_time()}] Bot: Transactions channel set to {interaction.channel_id}.")
-            elif choices == "debug":
+            elif choices.value == "debug":
                 settings["DEBUG_CHANNEL_ID"] = interaction.channel_id
                 dotenv.set_key(dotenv_file, "DEBUG_CHANNEL_ID", str(interaction.channel_id))
                 await interaction.response.send_message("Debug channel set.", ephemeral=True)
