@@ -13,6 +13,7 @@ Only the user id specified in ".env" can do the following:
 - [x] /shutdown - Safely shuts down the bot.
 - [x] /transactions - Allows the user to enable or disable the transactions service.
 - [x] /daily_scores - Allows the user to enable or disable the daily scores service.
+- [x] /set_channels - Allows the user to choose channels to display updates from within Discord.
 ### Recursive Functions
 - [x] Transactions - Will pull player transaction data from NBA.com and puts it into the selected channel.
 - [ ] Daily Scores - Displays the current day's games and their scores, and keeps the message up to date. (UNTESTED)
