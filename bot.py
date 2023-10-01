@@ -351,20 +351,20 @@ def run_discord_bot():
         # Send the message
         await interaction.response.send_message(embed=embed, ephemeral=False)
         
-        ############# Bot Services #############
-        async def start_update_scores():
-            if settings["DAILY_SCORE_ENABLED"]  is False:
-                if settings["DAILY_SCORE_RUNNING"] is False:
-                    settings["DAILY_SCORE_ENABLED"]  = True
-                    dotenv.set_key(dotenv_file, "DAILY_SCORE_ENABLED", "True")
-                    client.loop.create_task(fetch_and_display_games(client))
-                    print(f"[{current_time()}] Bot: Daily scores service started")
-                    return("Daily scores service started")
-                else:
-                    return("Daily scores service was recently shut down, please try again in a few minutes")
+    ############# Bot Services #############
+    async def start_update_scores():
+        if settings["DAILY_SCORE_ENABLED"]  is False:
+            if settings["DAILY_SCORE_RUNNING"] is False:
+                settings["DAILY_SCORE_ENABLED"]  = True
+                dotenv.set_key(dotenv_file, "DAILY_SCORE_ENABLED", "True")
+                client.loop.create_task(fetch_and_display_games(client))
+                print(f"[{current_time()}] Bot: Daily scores service started")
+                return("Daily scores service started")
             else:
-                print(f"[{current_time()}] Bot: Daily scores service already running")
-                return("Daily scores service already running")
+                return("Daily scores service was recently shut down, please try again in a few minutes")
+        else:
+            print(f"[{current_time()}] Bot: Daily scores service already running")
+            return("Daily scores service already running")
             
     async def stop_update_scores():
         if settings["DAILY_SCORE_ENABLED"]  is True:
