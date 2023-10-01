@@ -2,9 +2,9 @@ import os
 import responses
 from updaters import fetch_and_display_games, fetch_and_display_trades
 import db
-import discord
 import asyncio
 from datetime import datetime
+import discord
 from discord import app_commands
 import dotenv
 import nba_api.stats.static.players as players
@@ -23,11 +23,13 @@ settings = {
     "TRANSACTIONS_RUNNING": False
 }
 
+# Format the time for logging
 def current_time():
     current_time = datetime.now()
     formatted_time: str = current_time.strftime("%H:%M:%S")
     return formatted_time
 
+# Basic commands using "!" prefix
 async def send_message(message, user_message, is_private):
     try:
         response = responses.get_response(user_message)
@@ -36,9 +38,10 @@ async def send_message(message, user_message, is_private):
         else:
             return
     except Exception as e:
-        print(e)
+        print(f"[{current_time()}] Messages error: {e}")
         await message.channel.send("An error occurred. Please try again.")
 
+# Discord bot main functionality
 def run_discord_bot():
     # Load environment variables
     dotenv_file = dotenv.find_dotenv()
@@ -74,7 +77,7 @@ def run_discord_bot():
     client = discord.Client(intents=intents)
     tree = app_commands.CommandTree(client)
 
-    ############# Bot events #############
+    ############# Bot Events #############
     @client.event
     async def on_ready():
         global transactions_service
@@ -82,11 +85,17 @@ def run_discord_bot():
 
         print(f'{client.user} has connected to Discord!')
         # Daily Scores
-        client.loop.create_task(fetch_and_display_games(client))
-        print(f"[{current_time()}] Bot: Daily scores service started") if settings["DAILY_SCORE_ENABLED"] else print(f"[{current_time()}] Bot: Daily scores service disabled")       
+        if settings["DAILY_SCORE_ENABLED"]:
+            client.loop.create_task(fetch_and_display_games(client))
+            print(f"[{current_time()}] Bot: Daily scores service started")
+        else:
+            print(f"[{current_time()}] Bot: Daily scores service disabled")       
         # Transactions
-        client.loop.create_task(fetch_and_display_trades(client))
-        print(f"[{current_time()}] Bot: Transactions service started") if settings["TRANSACTIONS_ENABLED"] else print(f"[{current_time()}] Bot: Transactions service disabled")
+        if settings["TRANSACTIONS_ENABLED"]:
+            client.loop.create_task(fetch_and_display_trades(client))
+            print(f"[{current_time()}] Bot: Transactions service started")
+        else: 
+            print(f"[{current_time()}] Bot: Transactions service disabled")
 
         await client.change_presence(activity=discord.Activity(type=discord.ActivityType.playing, name="badly, no 3s."))
         print(f"[{current_time()}] Bot: Presence set")
@@ -109,7 +118,7 @@ def run_discord_bot():
         else:
             await send_message(message, message.content, True)
 
-    ############# Bot commands #############
+    ############# Bot Commands #############
     @tree.command(name='daily_scores', description='Enables or disables the daily scores service.', guild=discord.Object(id=settings["GUILD_ID"]))
     async def daily_scores(interaction, enable: bool):
         if interaction.user.id == settings["BOT_OWNER_ID"]:
@@ -166,6 +175,14 @@ def run_discord_bot():
             db.commit()
             db.close()
             await interaction.response.send_message("Shutting down in 5 seconds", ephemeral=True)
+            dotenv.set_key(dotenv_file, "TOKEN", settings["TOKEN"])
+            dotenv.set_key(dotenv_file, "GUILD_ID", str(settings["GUILD_ID"]))
+            dotenv.set_key(dotenv_file, "BOT_OWNER_ID", str(settings["BOT_OWNER_ID"]))
+            dotenv.set_key(dotenv_file, "TRANSACTION_CHANNEL_ID", str(settings["TRANSACTION_CHANNEL_ID"]))
+            dotenv.set_key(dotenv_file, "TODAYS_GAMES_CHANNEL_ID", str(settings["TODAYS_GAMES_CHANNEL_ID"]))
+            dotenv.set_key(dotenv_file, "DEBUG_CHANNEL_ID", str(settings["DEBUG_CHANNEL_ID"]))
+            dotenv.set_key(dotenv_file, "DAILY_SCORE_ENABLED", str(settings["DAILY_SCORE_ENABLED"]))
+            dotenv.set_key(dotenv_file, "TRANSACTIONS_ENABLED", str(settings["TRANSACTIONS_ENABLED"]))
             print(f"[{current_time()}] Bot: Shutting down")
             await asyncio.sleep(5)
             await client.close()
@@ -175,9 +192,11 @@ def run_discord_bot():
     @tree.command(name='player_stats', description='Gets the player\'s stats for the season.', guild=discord.Object(id=settings["GUILD_ID"]))
     async def player_stats(interaction, player_name: str):
         # Use the nba_api to search for a player
-        player_info = players.find_players_by_full_name(player_name)
-        if player_info:
-            player_id = player_info[0]['id']
+        player = players.find_players_by_full_name(player_name)
+        player_id = player[0]['id']
+        player_info = commonplayerinfo.CommonPlayerInfo(player_id=player_id)
+        if player_stats:
+            player_data = player_info.get_data_frames()[0].iloc[0]
             # Get the player's game log
             career_stats = playercareerstats.PlayerCareerStats(player_id=player_id)
             career_stats_df = career_stats.get_data_frames()[0]
@@ -186,7 +205,7 @@ def run_discord_bot():
             latest_year_stats = career_stats_df.iloc[-1]
 
             # Create the embed
-            embed = discord.Embed(title=f"Player Stats for {player_name}:", description=f"Team: `{latest_year_stats['TEAM_ABBREVIATION']}`", color=0x339cff)
+            embed = discord.Embed(title=f"Player Stats for {player_data['DISPLAY_FIRST_LAST']}:", description=f"Team: `{latest_year_stats['TEAM_ABBREVIATION']}`", color=0x339cff)
             embed.set_thumbnail(url=f"https://cdn.nba.com/headshots/nba/latest/260x190/{player_id}.png")
             embed.set_footer(text="Data provided by NBA.com", icon_url="https://pbs.twimg.com/profile_images/1692188312759341056/Eb9QQok7_200x200.jpg")
 
@@ -222,9 +241,11 @@ def run_discord_bot():
     @tree.command(name='player_log', description='Show the player\'s performance of their last 10 games.', guild=discord.Object(id=settings["GUILD_ID"]))
     async def player_stats(interaction, player_name: str):
         # Use the nba_api to search for a player
-        player_info = players.find_players_by_full_name(player_name)
-        if player_info:
-            player_id = player_info[0]['id']
+        player = players.find_players_by_full_name(player_name)
+        player_id = player[0]['id']
+        player_info = commonplayerinfo.CommonPlayerInfo(player_id=player_id)
+        if player:
+            player_data = player_info.get_data_frames()[0].iloc[0]
             # Get the player's game log
             game_log = playergamelog.PlayerGameLog(player_id=player_id)
             player_stats = game_log.get_data_frames()[0]
@@ -243,8 +264,11 @@ def run_discord_bot():
                 rebounds = row['REB']
                 formatted_message += f"__{game_info} - {matchup}:__\nPoints: `{points}`, Assists: `{assists}`, Rebounds: `{rebounds}`\n\n"
 
+            if formatted_message == "":
+                formatted_message = "No games found. NBA possibly updating data."
+
             # Create the embed
-            embed = discord.Embed(title=f"{player_name}'s Last 10 Games:", description=formatted_message, color=0x339cff)
+            embed = discord.Embed(title=f"{player_data['DISPLAY_FIRST_LAST']}'s Last 10 Games:", description=formatted_message, color=0x339cff)
             embed.set_thumbnail(url=f"https://cdn.nba.com/headshots/nba/latest/260x190/{player_id}.png")
             embed.set_footer(text="Data provided by NBA.com", icon_url="https://pbs.twimg.com/profile_images/1692188312759341056/Eb9QQok7_200x200.jpg")
 
@@ -256,14 +280,14 @@ def run_discord_bot():
     @tree.command(name='player_info', description='Show the player\'s more general information.', guild=discord.Object(id=settings["GUILD_ID"]))
     async def player_stats(interaction, player_name: str):
         # Use the nba_api to search for a player
-        player_id = players.find_players_by_full_name(player_name)
-        player_info = commonplayerinfo.CommonPlayerInfo(player_id=player_id[0]['id'])
-        
+        player = players.find_players_by_full_name(player_name)
+        player_id = player[0]['id']
+        player_info = commonplayerinfo.CommonPlayerInfo(player_id=player_id)
         if player_info:
             player_data = player_info.get_data_frames()[0].iloc[0]
 
             # Create the embed
-            embed = discord.Embed(title=f"{player_name}:", color=0x339cff)
+            embed = discord.Embed(title=f"{player_data['DISPLAY_FIRST_LAST']}:", color=0x339cff)
             embed.set_thumbnail(url=f"https://cdn.nba.com/headshots/nba/latest/260x190/{player_data['PERSON_ID']}.png")
             embed.set_footer(text="Data provided by NBA.com", icon_url="https://pbs.twimg.com/profile_images/1692188312759341056/Eb9QQok7_200x200.jpg")
 
@@ -294,7 +318,7 @@ def run_discord_bot():
         else:
             await interaction.response.send_message(f"Player {player_name} not found.", ephemeral=True)
 
-    @tree.command(name='league_leaders', description='Get a list of the top 15 players.', guild=discord.Object(id=settings["GUILD_ID"]))
+    @tree.command(name='league_leaders', description='Get a list of the top 20 players.', guild=discord.Object(id=settings["GUILD_ID"]))
     async def league_leaders(interaction):
         # Use the NBA API to fetch league leaders data
         leaders = LeagueLeaders().get_data_frames()[0]
@@ -315,6 +339,9 @@ def run_discord_bot():
             points = row['PTS']
             formatted_message += f"**__({player_rank}) {player_name}:__** Points: {points}, Minutes Played: {minutes_played}\n"
 
+        if formatted_message == "":
+            formatted_message = "No league leaders found. NBA possibly updating data."
+
         # Create an embed to display the league leaders
         embed = discord.Embed(title='NBA League Leaders', description=formatted_message, color=0x339cff)
 
@@ -323,27 +350,25 @@ def run_discord_bot():
 
         # Send the message
         await interaction.response.send_message(embed=embed, ephemeral=False)
-
-    ############# Bot services #############
-    async def start_update_scores():
-        if settings["DAILY_SCORE_ENABLED"]  is False:
-            if settings["DAILY_SCORE_RUNNING"] is False:
-                settings["DAILY_SCORE_ENABLED"]  = True
-                os.environ["DAILY_SCORE_ENABLED"] = "True"
-                dotenv.set_key(dotenv_file, "DAILY_SCORE_ENABLED", "True")
-                client.loop.create_task(fetch_and_display_games(client))
-                print(f"[{current_time()}] Bot: Daily scores service started")
-                return("Daily scores service started")
+        
+        ############# Bot Services #############
+        async def start_update_scores():
+            if settings["DAILY_SCORE_ENABLED"]  is False:
+                if settings["DAILY_SCORE_RUNNING"] is False:
+                    settings["DAILY_SCORE_ENABLED"]  = True
+                    dotenv.set_key(dotenv_file, "DAILY_SCORE_ENABLED", "True")
+                    client.loop.create_task(fetch_and_display_games(client))
+                    print(f"[{current_time()}] Bot: Daily scores service started")
+                    return("Daily scores service started")
+                else:
+                    return("Daily scores service was recently shut down, please try again in a few minutes")
             else:
-                return("Daily scores service was recently shut down, please try again in a few minutes")
-        else:
-            print(f"[{current_time()}] Bot: Daily scores service already running")
-            return("Daily scores service already running")
+                print(f"[{current_time()}] Bot: Daily scores service already running")
+                return("Daily scores service already running")
             
     async def stop_update_scores():
         if settings["DAILY_SCORE_ENABLED"]  is True:
             settings["DAILY_SCORE_ENABLED"]  = False
-            os.environ["DAILY_SCORE_ENABLED"] = "False"
             dotenv.set_key(dotenv_file, "DAILY_SCORE_ENABLED", "False")
             print(f"[{current_time()}] Bot: Daily scores service stopped")
             return("Daily scores service stopped")
@@ -355,7 +380,6 @@ def run_discord_bot():
         if settings["TRANSACTIONS_ENABLED"] is False:
             if settings["TRANSACTIONS_RUNNING"] is False:
                 settings["TRANSACTIONS_ENABLED"] = True
-                os.environ["TRANSACTIONS_ENABLED"] = "True"
                 dotenv.set_key(dotenv_file, "TRANSACTIONS_ENABLED", "True")
                 client.loop.create_task(fetch_and_display_trades(client))
                 print(f"[{current_time()}] Bot: Transactions service started")
@@ -369,7 +393,6 @@ def run_discord_bot():
     async def stop_update_trades():
         if settings["TRANSACTIONS_ENABLED"] is True:
             settings["TRANSACTIONS_ENABLED"] = False
-            os.environ["TRANSACTIONS_ENABLED"] = "False"
             dotenv.set_key(dotenv_file, "TRANSACTIONS_ENABLED", "False")
             print(f"[{current_time()}] Bot: Transactions service stopped")
             return("Transactions service stopped")
