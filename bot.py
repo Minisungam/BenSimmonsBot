@@ -1,8 +1,11 @@
 import os
 import responses
+import aiohttp
 from updaters import fetch_and_display_games, fetch_and_display_trades
 import db
+import asyncpraw
 import asyncio
+import random
 from datetime import datetime
 import discord
 from discord import app_commands
@@ -11,7 +14,7 @@ import nba_api.stats.static.players as players
 from nba_api.stats.endpoints import playercareerstats, playergamelog, commonplayerinfo, LeagueLeaders
 
 settings = {
-    "TOKEN": "",
+    "BOT_TOKEN": "",
     "GUILD_ID": 0,
     "BOT_OWNER_ID": 0,
     "TRANSACTION_CHANNEL_ID": 0,
@@ -20,7 +23,9 @@ settings = {
     "DAILY_SCORE_ENABLED": False,
     "DAILY_SCORE_RUNNING": False,
     "TRANSACTIONS_ENABLED": False,
-    "TRANSACTIONS_RUNNING": False
+    "TRANSACTIONS_RUNNING": False,
+    "REDDIT_BOT_ID": "",
+    "REDDIT_BOT_SECRET": ""
 }
 
 # Format the time for logging
@@ -50,7 +55,7 @@ def run_discord_bot():
         if os.getenv('BOT_TOKEN') == "":
             raise Exception
         else:
-            settings["TOKEN"]: str = os.getenv('BOT_TOKEN')
+            settings["BOT_TOKEN"]: str = os.getenv('BOT_TOKEN')
         settings["GUILD_ID"]: int = int(os.getenv('GUILD_ID'))
         settings["BOT_OWNER_ID"]: int = int(os.getenv('BOT_OWNER_ID'))
         settings["TRANSACTION_CHANNEL_ID"]: int = int(os.getenv('TRANSACTION_CHANNEL_ID'))
@@ -69,6 +74,11 @@ def run_discord_bot():
     except:
         settings["TRANSACTIONS_ENABLED"]: bool = False
         print(f"[{current_time()}] Bot: TRANSACTIONS_ENABLED setting incorrect in .env file, must be \"True\" or \"False\". Defaulting to False.")
+    try:
+        settings["REDDIT_BOT_ID"]: str = os.getenv('REDDIT_BOT_ID')
+        settings["REDDIT_BOT_SECRET"]: str = os.getenv('REDDIT_BOT_SECRET')
+    except:
+        print(f"[{current_time()}] Bot: Reddit environment variables missing in .env file.")
 
 
     # Bot setup
@@ -175,7 +185,7 @@ def run_discord_bot():
             db.commit()
             db.close()
             await interaction.response.send_message("Shutting down in 5 seconds", ephemeral=True)
-            dotenv.set_key(dotenv_file, "TOKEN", settings["TOKEN"])
+            dotenv.set_key(dotenv_file, "BOT_TOKEN", settings["BOT_TOKEN"])
             dotenv.set_key(dotenv_file, "GUILD_ID", str(settings["GUILD_ID"]))
             dotenv.set_key(dotenv_file, "BOT_OWNER_ID", str(settings["BOT_OWNER_ID"]))
             dotenv.set_key(dotenv_file, "TRANSACTION_CHANNEL_ID", str(settings["TRANSACTION_CHANNEL_ID"]))
@@ -350,7 +360,45 @@ def run_discord_bot():
 
         # Send the message
         await interaction.response.send_message(embed=embed, ephemeral=False)
+
+    @tree.command(name='meme', description='Display a random top 50 hot post from r/Nbamemes.', guild=discord.Object(id=settings["GUILD_ID"]))
+    async def meme(interaction):
+        try:
+            reddit = asyncpraw.Reddit(client_id=settings["REDDIT_BOT_ID"],
+                        client_secret=settings["REDDIT_BOT_SECRET"],
+                        user_agent='BenSimmonsBot by Minisungam')
+        except:
+            await interaction.response.send_message("The Reddit meme grabber has not been setup.", ephemeral=True)
+            return
         
+        subreddit = await reddit.subreddit('Nbamemes')
+
+        memes_submissions = []
+        async for submission in subreddit.hot(limit=50):
+            memes_submissions.append(submission)
+
+        invalid = True
+        while invalid:
+            submission = random.choice(memes_submissions)
+            # Imgur links not reliable (need to research into pulling reddit preview links)
+            if submission.url.endswith(('.jpg', '.png', '.gif')) and "imgur" not in submission.url:
+                    invalid = False
+            elif len(memes_submissions) == 0:
+                await interaction.response.send_message("There are no valid memes available.", ephemeral=True)
+                return
+            else:
+                memes_submissions.remove(submission)
+            
+        author = await reddit.redditor(submission.author, fetch=True)
+
+        embed = discord.Embed(title=submission.title, url=f"https://reddit.com{submission.permalink}", timestamp=datetime.fromtimestamp(submission.created_utc), color=0x9aff73)
+        embed.set_image(url=str(submission.url))
+        embed.set_footer(text=f"Posted by u/{author.name}", icon_url=author.icon_img)
+
+        print(f"[{current_time()}] Meme: {interaction.user.name} requested a meme, sent {submission.url}")
+        await interaction.response.send_message(embed=embed, ephemeral=False)
+        await reddit.close()
+
     ############# Bot Services #############
     async def start_update_scores():
         if settings["DAILY_SCORE_ENABLED"]  is False:
@@ -400,4 +448,4 @@ def run_discord_bot():
             print(f"[{current_time()}] Bot: Transactions service already stopped")
             return("Transactions service already stopped")
 
-    client.run(settings["TOKEN"])
+    client.run(settings["BOT_TOKEN"])
