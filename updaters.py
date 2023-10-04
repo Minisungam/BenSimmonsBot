@@ -61,40 +61,41 @@ async def fetch_and_display_trades(client):
             trades = soup.find_all("div", class_="TransactionSingle_base__y2kG1")
             trades.reverse()
 
-            if len(trades) == 0:
-                print(f"[{current_time()}] Trades: No trades found")
-            else:
-                print(f"[{current_time()}] Trades: Found {len(trades)} trades")
-
-            posted_trades_tuples = db.get_all_transactions()
-            posted_trades = [item[0] for item in posted_trades_tuples]
-            skipped = 0
-            added = 0
-
-            # Format and post new trades to Discord
-            for trade in trades:
-                trade_details = trade.find("div", class_="TransactionSingle_desc__uG447").text.strip()
-                player_image = trade.find("img", class_="PlayerImage_image__wH_YX")
-                player_image_url = player_image['src']
-                formatted_trade = discord.Embed(title="**__New Player Transaction__**", description=trade_details, color=0xf52f63, timestamp=datetime.now(), url=nba_transactions_url)
-                formatted_trade.set_thumbnail(url=player_image_url)
-                formatted_trade.set_footer(text=f"NBA", icon_url="https://pbs.twimg.com/profile_images/1692188312759341056/Eb9QQok7_200x200.jpg")
-
-                # Check if the trade has been posted before
-                if trade_details not in posted_trades:
-                    # Post the trade to Discord
-                    transaction_channel = client.get_channel(bot.settings["TRANSACTION_CHANNEL_ID"])
-                    await transaction_channel.send(embed=formatted_trade)
-                    await asyncio.sleep(1)
-
-                    # Add the trade to the list of posted trades
-                    added += 1
-                    db.add_transaction(trade_details)
+            if trades:
+                if len(trades) == 0:
+                    print(f"[{current_time()}] Trades: No trades found")
                 else:
-                    skipped += 1
+                    print(f"[{current_time()}] Trades: Found {len(trades)} trades")
 
-            print(f"[{current_time()}] Trades: Skipped " + str(skipped) + ". Added " + str(added) + ".")
-            db.commit()
+                posted_trades_tuples = db.get_all_transactions()
+                posted_trades = [item[0] for item in posted_trades_tuples]
+                skipped = 0
+                added = 0
+
+                # Format and post new trades to Discord
+                for trade in trades:
+                    trade_details = trade.find("div", class_="TransactionSingle_desc__uG447").text.strip()
+                    player_image = trade.find("img", class_="PlayerImage_image__wH_YX")
+                    player_image_url = player_image['src']
+                    formatted_trade = discord.Embed(title="**__New Player Transaction__**", description=trade_details, color=0xf52f63, timestamp=datetime.now(), url=nba_transactions_url)
+                    formatted_trade.set_thumbnail(url=player_image_url)
+                    formatted_trade.set_footer(text=f"NBA", icon_url="https://pbs.twimg.com/profile_images/1692188312759341056/Eb9QQok7_200x200.jpg")
+
+                    # Check if the trade has been posted before
+                    if trade_details not in posted_trades:
+                        # Post the trade to Discord
+                        transaction_channel = client.get_channel(bot.settings["TRANSACTION_CHANNEL_ID"])
+                        await transaction_channel.send(embed=formatted_trade)
+                        await asyncio.sleep(1)
+
+                        # Add the trade to the list of posted trades
+                        added += 1
+                        db.add_transaction(trade_details)
+                    else:
+                        skipped += 1
+
+                print(f"[{current_time()}] Trades: Skipped " + str(skipped) + ". Added " + str(added) + ".")
+                db.commit()
 
             print(f"[{current_time()}] Trades: Sleeping for 10 minutes")
             await asyncio.sleep(600)
