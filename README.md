@@ -22,6 +22,9 @@ Only the user id specified in ".env" can do the following:
 - [x] !help - Displays a list of chat commands.
 - [x] !roll - Rolls a random number between 1 and 10.
 - [x] !abbreviations - Displays a list of NBA stat abbreviations.
+## Requirements
+Python 3.10
+
 ## Install
 `pip install -r requirements.txt`
 
