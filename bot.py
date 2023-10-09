@@ -22,6 +22,7 @@ settings = {
     "DEBUG_CHANNEL_ID": 0,
     "DAILY_SCORE_ENABLED": False,
     "DAILY_SCORE_RUNNING": False,
+    "DAILY SCORE_LAST_MESSAGE_ID": 0,
     "TRANSACTIONS_ENABLED": False,
     "TRANSACTIONS_RUNNING": False,
     "REDDIT_BOT_ID": "",
@@ -339,6 +340,7 @@ def run_discord_bot():
         # Limit the number of leaders to display (adjust as needed)
         max_leaders = 20
         leaders = leaders.head(max_leaders)
+        print(leaders)
 
         # Create an embed to display the league leaders
         embed = discord.Embed(title='NBA League Leaders', color=0x339cff)
