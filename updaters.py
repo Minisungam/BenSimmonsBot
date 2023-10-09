@@ -118,38 +118,41 @@ async def fetch_and_display_games(client):
         while os.environ['DAILY_SCORE_ENABLED'] == "True":
             # Fetch the list of games for the current day using NBA API
             today = date.today().strftime('%Y-%m-%d')
+            print(f"[{current_time()}] Daily Score: Fetching games for {today}")
             response = scoreboardv2.ScoreboardV2(game_date=today)
 
+            print(response)
+
             game_message = db.get_current_day_games()[1]
+
+            games = response.get_data_frames()[0]
+            print(games)
             
-            if response.data_sets:
-                try:
-                    games = response.get_data_frames()[0]
+            try:
+                # Create a formatted message with game information
+                formatted_message = "Current Day's NBA Games:\n"
+                for index, game in games.iterrows():
+                    formatted_message += f"{game['GAMECODE']} - {game['GAME_STATUS_TEXT']} ({game['GAME_CLOCK']})\n"
 
-                    # Create a formatted message with game information
-                    formatted_message = "Current Day's NBA Games:\n"
-                    for index, game in games.iterrows():
-                        formatted_message += f"{game['GAMECODE']} - {game['GAME_STATUS_TEXT']} ({game['GAME_CLOCK']})\n"
-
-                    # Update the message with the list of games
-                    if bot.game_message != "":
-                        await bot.game_message.edit(content=formatted_message)
-                    else:
-                        # If the message doesn't exist yet, send a new message
-                        bot.game_message = await client.get_channel(bot.settings["TODAYS_GAMES_CHANNEL_ID"]).send(formatted_message)
-                except IndexError:
-                    return
-                except Exception as e:
-                    # Handle any exceptions that might occur while processing the data
-                    print(f"[{current_time()}] Trades: Error processing NBA data: {e}")
-            else:
-                # Handle the case when there are no games for the current day
-                formatted_message = "No NBA games scheduled for today."
-
-                if bot.game_message is not None:
+                # Update the message with the list of games
+                if bot.game_message != "":
                     await bot.game_message.edit(content=formatted_message)
                 else:
-                    game_message = await client.get_channel(bot.settings["TODAYS_GAMES_CHANNEL_ID"]).send(formatted_message)
+                    # If the message doesn't exist yet, send a new message
+                    bot.game_message = await client.get_channel(bot.settings["TODAYS_GAMES_CHANNEL_ID"]).send(formatted_message)
+            except IndexError:
+                return
+            except Exception as e:
+                # Handle any exceptions that might occur while processing the data
+                print(f"[{current_time()}] Daily Score: Error processing NBA data: {e}")
+        else:
+            # Handle the case when there are no games for the current day
+            formatted_message = "No NBA games scheduled for today."
+
+            if bot.game_message is not None:
+                await bot.game_message.edit(content=formatted_message)
+            else:
+                game_message = await client.get_channel(bot.settings["TODAYS_GAMES_CHANNEL_ID"]).send(formatted_message)
 
             await asyncio.sleep(300)  # Update every 5 minutes
 

@@ -10,7 +10,7 @@ from datetime import datetime
 import discord
 from discord import app_commands
 import dotenv
-import nba_api.stats.static.players as players
+from nba_api.stats.static import players
 from nba_api.stats.endpoints import playercareerstats, playergamelog, commonplayerinfo, LeagueLeaders
 
 settings = {
@@ -201,12 +201,13 @@ def run_discord_bot():
 
     @tree.command(name='player_stats', description='Gets the player\'s stats for the season.', guild=discord.Object(id=settings["GUILD_ID"]))
     async def player_stats(interaction, player_name: str):
-        # Use the nba_api to search for a player
-        player = players.find_players_by_full_name(player_name)
-        player_id = player[0]['id']
-        player_info = commonplayerinfo.CommonPlayerInfo(player_id=player_id)
-        if player_stats:
+        try:
+            # Use the nba_api to search for a player
+            player = players.find_players_by_full_name(player_name)
+            player_id = player[0]['id']
+            player_info = commonplayerinfo.CommonPlayerInfo(player_id=player_id)
             player_data = player_info.get_data_frames()[0].iloc[0]
+
             # Get the player's game log
             career_stats = playercareerstats.PlayerCareerStats(player_id=player_id)
             career_stats_df = career_stats.get_data_frames()[0]
@@ -245,17 +246,18 @@ def run_discord_bot():
 
             # Respond to the interaction
             await interaction.response.send_message(embed=embed, ephemeral=False)
-        else:
+        except:
             await interaction.response.send_message(f"Player {player_name} not found.", ephemeral=True)
 
     @tree.command(name='player_log', description='Show the player\'s performance of their last 10 games.', guild=discord.Object(id=settings["GUILD_ID"]))
     async def player_stats(interaction, player_name: str):
-        # Use the nba_api to search for a player
-        player = players.find_players_by_full_name(player_name)
-        player_id = player[0]['id']
-        player_info = commonplayerinfo.CommonPlayerInfo(player_id=player_id)
-        if player:
+        try:
+            # Use the nba_api to search for a player
+            player = players.find_players_by_full_name(player_name)
+            player_id = player[0]['id']
+            player_info = commonplayerinfo.CommonPlayerInfo(player_id=player_id)
             player_data = player_info.get_data_frames()[0].iloc[0]
+
             # Get the player's game log
             game_log = playergamelog.PlayerGameLog(player_id=player_id)
             player_stats = game_log.get_data_frames()[0]
@@ -284,16 +286,17 @@ def run_discord_bot():
 
             # Respond to the interaction
             await interaction.response.send_message(embed=embed, ephemeral=False)
-        else:
+        except:
             await interaction.response.send_message(f"Player {player_name} not found.", ephemeral=True)
 
     @tree.command(name='player_info', description='Show the player\'s more general information.', guild=discord.Object(id=settings["GUILD_ID"]))
     async def player_stats(interaction, player_name: str):
-        # Use the nba_api to search for a player
-        player = players.find_players_by_full_name(player_name)
-        player_id = player[0]['id']
-        player_info = commonplayerinfo.CommonPlayerInfo(player_id=player_id)
-        if player_info:
+        try:
+            # Use the nba_api to search for a player
+            player = players.find_players_by_full_name(player_name)
+            player_id = player[0]['id']
+            player_info = commonplayerinfo.CommonPlayerInfo(player_id=player_id)
+        
             player_data = player_info.get_data_frames()[0].iloc[0]
 
             # Create the embed
@@ -325,7 +328,7 @@ def run_discord_bot():
             
             # Respond to the interaction
             await interaction.response.send_message(embed=embed, ephemeral=False)
-        else:
+        except:
             await interaction.response.send_message(f"Player {player_name} not found.", ephemeral=True)
 
     @tree.command(name='league_leaders', description='Get a list of the top 20 players.', guild=discord.Object(id=settings["GUILD_ID"]))
