@@ -18,11 +18,13 @@ settings = {
     "GUILD_ID": 0,
     "BOT_OWNER_ID": 0,
     "TRANSACTION_CHANNEL_ID": 0,
-    "TODAYS_GAMES_CHANNEL_ID": 0,
+    "DAILY_SCORE_CHANNEL_ID": 0,
     "DEBUG_CHANNEL_ID": 0,
+    "DEBUG_OUTPUT": False,
     "DAILY_SCORE_ENABLED": False,
     "DAILY_SCORE_RUNNING": False,
-    "DAILY SCORE_LAST_MESSAGE_ID": 0,
+    "DAILY_SCORE_LAST_MESSAGE_ID": 0,
+    "DAILY_SCORE_LAST_DATE": "",
     "TRANSACTIONS_ENABLED": False,
     "TRANSACTIONS_RUNNING": False,
     "REDDIT_BOT_ID": "",
@@ -47,21 +49,44 @@ async def send_message(message, user_message, is_private):
         print(f"[{current_time()}] Messages error: {e}")
         await message.channel.send("An error occurred. Please try again.")
 
+def update_env_file():
+    # Load environment variables
+    dotenv_file = dotenv.find_dotenv()
+    dotenv.load_dotenv(dotenv_file)
+    
+    # Update environment variables
+    dotenv.set_key(dotenv_file, "BOT_TOKEN", settings["BOT_TOKEN"])
+    dotenv.set_key(dotenv_file, "GUILD_ID", str(settings["GUILD_ID"]))
+    dotenv.set_key(dotenv_file, "BOT_OWNER_ID", str(settings["BOT_OWNER_ID"]))
+    dotenv.set_key(dotenv_file, "TRANSACTION_CHANNEL_ID", str(settings["TRANSACTION_CHANNEL_ID"]))
+    dotenv.set_key(dotenv_file, "DAILY_SCORE_CHANNEL_ID", str(settings["DAILY_SCORE_CHANNEL_ID"]))
+    dotenv.set_key(dotenv_file, "DEBUG_CHANNEL_ID", str(settings["DEBUG_CHANNEL_ID"]))
+    dotenv.set_key(dotenv_file, "DEBUG_OUTPUT", str(settings["DEBUG_OUTPUT"]))
+    dotenv.set_key(dotenv_file, "DAILY_SCORE_LAST_MESSAGE_ID", str(settings["DAILY_SCORE_LAST_MESSAGE_ID"]))
+    dotenv.set_key(dotenv_file, "DAILY_SCORE_ENABLED", str(settings["DAILY_SCORE_ENABLED"]))
+    dotenv.set_key(dotenv_file, "DAILY_SCORE_LAST_DATE", str(settings["DAILY_SCORE_LAST_DATE"]))
+    dotenv.set_key(dotenv_file, "TRANSACTIONS_ENABLED", str(settings["TRANSACTIONS_ENABLED"]))
+
 # Discord bot main functionality
 def run_discord_bot():
     # Load environment variables
     dotenv_file = dotenv.find_dotenv()
     dotenv.load_dotenv(dotenv_file)
     try:
+        # If bot token is not set, give up all hope
         if os.getenv('BOT_TOKEN') == "":
             raise Exception
         else:
             settings["BOT_TOKEN"]: str = os.getenv('BOT_TOKEN')
+        
         settings["GUILD_ID"]: int = int(os.getenv('GUILD_ID'))
         settings["BOT_OWNER_ID"]: int = int(os.getenv('BOT_OWNER_ID'))
         settings["TRANSACTION_CHANNEL_ID"]: int = int(os.getenv('TRANSACTION_CHANNEL_ID'))
-        settings["TODAYS_GAMES_CHANNEL_ID"]: int = int(os.getenv('TODAYS_GAMES_CHANNEL_ID'))
+        settings["DAILY_SCORE_CHANNEL_ID"]: int = int(os.getenv('DAILY_SCORE_CHANNEL_ID'))
         settings["DEBUG_CHANNEL_ID"]: int = int(os.getenv('DEBUG_CHANNEL_ID'))
+        settings["DEBUG_OUTPUT"]: bool = eval(os.getenv('DEBUG_OUTPUT'))
+        settings["DAILY_SCORE_LAST_MESSAGE_ID"]: int = int(os.getenv('DAILY_SCORE_LAST_MESSAGE_ID'))
+        settings["DAILY_SCORE_LAST_DATE"]: str = os.getenv('DAILY_SCORE_LAST_DATE')
     except:
         print(f"[{current_time()}] Bot: Environment variables missing in .env file.")
         return
@@ -163,8 +188,8 @@ def run_discord_bot():
     async def set_channels(interaction, choices: app_commands.Choice[str]):
         if interaction.user.id == settings["BOT_OWNER_ID"]:
             if choices.value == "daily_scores":
-                settings["TODAYS_GAMES_CHANNEL_ID"] = interaction.channel_id
-                dotenv.set_key(dotenv_file, "TODAYS_GAMES_CHANNEL_ID", str(interaction.channel_id))
+                settings["DAILY_SCORE_CHANNEL_ID"] = interaction.channel_id
+                dotenv.set_key(dotenv_file, "DAILY_SCORE_CHANNEL_ID", str(interaction.channel_id))
                 await interaction.response.send_message("Daily scores channel set.", ephemeral=True)
                 print(f"[{current_time()}] Bot: Daily scores channel set to {interaction.channel_id}.")
             elif choices.value == "transactions":
@@ -186,14 +211,7 @@ def run_discord_bot():
             db.commit()
             db.close()
             await interaction.response.send_message("Shutting down in 5 seconds", ephemeral=True)
-            dotenv.set_key(dotenv_file, "BOT_TOKEN", settings["BOT_TOKEN"])
-            dotenv.set_key(dotenv_file, "GUILD_ID", str(settings["GUILD_ID"]))
-            dotenv.set_key(dotenv_file, "BOT_OWNER_ID", str(settings["BOT_OWNER_ID"]))
-            dotenv.set_key(dotenv_file, "TRANSACTION_CHANNEL_ID", str(settings["TRANSACTION_CHANNEL_ID"]))
-            dotenv.set_key(dotenv_file, "TODAYS_GAMES_CHANNEL_ID", str(settings["TODAYS_GAMES_CHANNEL_ID"]))
-            dotenv.set_key(dotenv_file, "DEBUG_CHANNEL_ID", str(settings["DEBUG_CHANNEL_ID"]))
-            dotenv.set_key(dotenv_file, "DAILY_SCORE_ENABLED", str(settings["DAILY_SCORE_ENABLED"]))
-            dotenv.set_key(dotenv_file, "TRANSACTIONS_ENABLED", str(settings["TRANSACTIONS_ENABLED"]))
+            update_env_file()
             print(f"[{current_time()}] Bot: Shutting down")
             await asyncio.sleep(5)
             await client.close()
@@ -452,5 +470,5 @@ def run_discord_bot():
         else:
             print(f"[{current_time()}] Bot: Transactions service already stopped")
             return("Transactions service already stopped")
-
+        
     client.run(settings["BOT_TOKEN"])

@@ -4,6 +4,7 @@ from selenium import webdriver
 from selenium.common.exceptions import WebDriverException, TimeoutException
 from bs4 import BeautifulSoup
 from datetime import date
+import dotenv
 from nba_api.stats.endpoints import scoreboardv2
 import requests
 
@@ -50,10 +51,16 @@ async def fetch_and_display_trades_new(client):
     bot.settings["TRANSACTIONS_RUNNING"] = True
 
 async def fetch_and_display_trades(client):
-    bot.settings["TRANSACTIONS_RUNNING"] = True
+    # Check if debug channel is set
+    debug_channel = None
     try:
         debug_channel = client.get_channel(bot.settings["DEBUG_CHANNEL_ID"])
+    except:
+        bot.settings["DEBUG_OUTPUT"] = False
+        print(f"[{current_time()}] Bot: Debug channel not found. Disabling debug output.")
 
+    bot.settings["TRANSACTIONS_RUNNING"] = True
+    try:
         while os.environ['TRANSACTIONS_ENABLED'] == "True":       
 
             page_source = await fetch_trades()
@@ -91,7 +98,7 @@ async def fetch_and_display_trades(client):
                     if trade_details not in posted_trades:
                         # Post the trade to Discord
                         transaction_channel = client.get_channel(bot.settings["TRANSACTION_CHANNEL_ID"])
-                        await transaction_channel.send(embed=formatted_trade)
+                        #await transaction_channel.send(embed=formatted_trade)
                         await asyncio.sleep(1)
 
                         # Add the trade to the list of posted trades
@@ -103,72 +110,104 @@ async def fetch_and_display_trades(client):
                 print(f"[{current_time()}] Trades: Skipped " + str(skipped) + ". Added " + str(added) + ".")
                 db.commit()
 
-            print(f"[{current_time()}] Trades: Sleeping for 10 minutes")
             await asyncio.sleep(600)
 
     except Exception as e:
-        await debug_channel.send(f"Trades error: ```{str(e)}```")
+        if bot.settings["DEBUG_OUTPUT"]:
+            await debug_channel.send(f"Trades error: ```{str(e)}```")
         print(f"[{current_time()}] Trades: Error: {str(e)}")
     finally:
-        await debug_channel.send("Trades service has stopped.")
+        if bot.settings["DEBUG_OUTPUT"]:
+            await debug_channel.send("Trades service has stopped.")
         bot.settings["TRANSACTIONS_ENABLED"] = False
         bot.settings["TRANSACTIONS_RUNNING"] = False
         print(f"[{current_time()}] Trades: fully exited.")
 
 
 async def fetch_and_display_games(client):
-    global last_sent_message
+    # Check if debug channel is set
+    debug_channel = None
+    try:
+        debug_channel = client.get_channel(bot.settings["DEBUG_CHANNEL_ID"])
+    except:
+        bot.settings["DEBUG_OUTPUT"] = False
+        print(f"[{current_time()}] Bot: Debug channel not found. Disabling debug output.")
+
     bot.settings["DAILY_SCORE_RUNNING"] = True
-    if settings['DAILY_SCORE_MESSAGE_ID'] != 0:
-        try:
-            debug_channel = client.get_channel(bot.settings["DEBUG_CHANNEL_ID"])
+    try:
+        daily_score_channel = client.get_channel(bot.settings["DAILY_SCORE_CHANNEL_ID"])
 
-            while os.environ['DAILY_SCORE_ENABLED'] == "True":
-                todaysScoreboard = requests.get("https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json").json()
-                scoreboard_info = todaysScoreboard["scoreboard"]
-                games = scoreboard_info["games"]
+        while os.environ['DAILY_SCORE_ENABLED'] == "True":
+            new_message = False
+            # Fetch the last sent message using the message ID
+            try:
+                last_message_sent = await daily_score_channel.fetch_message(bot.settings['DAILY_SCORE_LAST_MESSAGE_ID'])
+            except:
+                last_message_sent = None
+                new_message = True
+                print(f"[{current_time()}] Daily Score: Message not found. Creating new message.")
 
-                # Get the current date from the scoreboard data
-                scoreboard_date = datetime.datetime.strptime(scoreboard_info["gameDate"], "%Y-%m-%d").date()
+            todaysScoreboard = requests.get("https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json").json()
+            scoreboard_info = todaysScoreboard["scoreboard"]
+            games = scoreboard_info["games"]
 
-                # Check if the date has changed
-                if has_date_changed(scoreboard_date):
-                    embed = discord.Embed(title="Today's Scores", color=0xf52f63)
-                else:
-                    embed = discord.Embed(title="Updated Scores", color=0xf52f63)
+            # Get the current date from the scoreboard data
+            scoreboard_date = datetime.strptime(scoreboard_info["gameDate"], "%Y-%m-%d").date()
+            
+            # Check if the date has changed
+            if str(scoreboard_date) != str(datetime.now().strftime("%Y-%m-%d")):
+                new_message = True
+                print(f"[{current_time()}] Daily Score: Date has changed. Creating new message.")
 
-                for game in games:
-                    game_info = {
-                        "Game ID": game["gameId"],
-                        "Game Status": game["gameStatusText"],
-                        "Time": f"Q{game['period']} {game['gameClock']}",
-                        "Home Team City": game["homeTeam"]["teamCity"],
-                        "Home Team Name": game["homeTeam"]["teamName"],
-                        "Away Team City": game["awayTeam"]["teamCity"],
-                        "Away Team Name": game["awayTeam"]["teamName"],
-                        "Home Team Score": game["homeTeam"]["score"],
-                        "Away Team Score": game["awayTeam"]["score"],
-                    }
+            embed = discord.Embed(title=f"Scores for {str(scoreboard_date.strftime('%B %dth, %Y'))}", color=0xf52f63)
 
+            for game in games:
+                game_info = {
+                    "Game ID": game["gameId"],
+                    "Game Status": game["gameStatusText"],
+                    "Period": f"{game['period']}",
+                    "Game Status Text": f"{game['gameStatusText']}",
+                    "Time": f"Q{game['period']} {game['gameClock']}",
+                    "Home Team City": game["homeTeam"]["teamCity"],
+                    "Home Team Name": game["homeTeam"]["teamName"],
+                    "Away Team City": game["awayTeam"]["teamCity"],
+                    "Away Team Name": game["awayTeam"]["teamName"],
+                    "Home Team Score": game["homeTeam"]["score"],
+                    "Away Team Score": game["awayTeam"]["score"],
+                }
+
+                if game_info["Period"] == "0":
                     embed.add_field(
-                        name=f"**Home: {game_info['Home Team City']} {game_info['Home Team Name']} VS Away: {game_info['Away Team City']} {game_info['Away Team Name']}**\n", 
-                        value=f"Time: {game_info['Time']}\nScore: {game_info['Home Team Name']} {game_info['Home Team Score']} - {game_info['Away Team Name']} {game_info['Away Team Score']}", 
+                        name=f"**{game_info['Home Team City']} {game_info['Home Team Name']} VS {game_info['Away Team City']} {game_info['Away Team Name']}**\n",
+                        value=f"Game starting at: {game_info['Game Status Text']}", 
                         inline=False
                     )
-
-                # Send a new message or edit the existing one
-                if last_sent_message:
-                    await last_sent_message.edit(embed=embed)
                 else:
-                    last_sent_message = await debug_channel.send(embed=embed)
+                    embed.add_field(
+                    name=f"**{game_info['Home Team City']} {game_info['Home Team Name']} VS {game_info['Away Team City']} {game_info['Away Team Name']}**\n", 
+                    value=f"Time: `{game_info['Time']}`\n{game_info['Home Team Name']}: `{game_info['Home Team Score']}`\n{game_info['Away Team Name']}: `{game_info['Away Team Score']}`", 
+                    inline=False
+                    )
 
-                await asyncio.sleep(300)  # Update every 5 minutes
+            if new_message:
+                # Send the message to Discord
+                await daily_score_channel.send(embed=embed)
+                bot.settings['DAILY_SCORE_LAST_MESSAGE_ID'] = daily_score_channel.last_message_id
+                bot.settings['DAILY_SCORE_LAST_DATE'] = datetime.now().strftime("%Y-%m-%d")
+                bot.update_env_file()
+            else:
+                # Edit the message
+                await last_message_sent.edit(embed=embed)
 
-        except Exception as e:
+            await asyncio.sleep(15)  # Update every 15 seconds
+
+    except Exception as e:
+        if bot.settings["DEBUG_OUTPUT"]:
             await debug_channel.send(f"Daily score error: ```{str(e)}```")
-            print(f"[{current_time()}] Daily Score: Error intended, will be fixed once season starts.")
-        finally:  
+        print(f"[{current_time()}] Daily Score: {str(e)}")
+    finally:
+        if bot.settings["DEBUG_OUTPUT"]:  
             await debug_channel.send("Daily score service has stopped.")
-            bot.settings["DAILY_SCORE_ENABLED"] = False
-            bot.settings["DAILY_SCORE_RUNNING"] = False
-            print(f"[{current_time()}] Daily Score: Fully exited.")
+        bot.settings["DAILY_SCORE_ENABLED"] = False
+        bot.settings["DAILY_SCORE_RUNNING"] = False
+        print(f"[{current_time()}] Daily Score: Fully exited.")
