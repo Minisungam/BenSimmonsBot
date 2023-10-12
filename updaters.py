@@ -1,12 +1,5 @@
-import discord, bot , asyncio, db, os, functools, typing
+import discord, bot, asyncio, db, os, requests
 from datetime import datetime
-from selenium import webdriver
-from selenium.common.exceptions import WebDriverException, TimeoutException
-from bs4 import BeautifulSoup
-from datetime import date
-import dotenv
-from nba_api.stats.endpoints import scoreboardv2
-import requests
 
 nba_transactions_url = "https://www.nba.com/players/transactions"
 
@@ -14,41 +7,6 @@ def current_time():
     current_time = datetime.now()
     formatted_time: str = current_time.strftime("%H:%M:%S")
     return formatted_time
-
-def run_fetch_trades(func: typing.Callable) -> typing.Coroutine:
-    @functools.wraps(func)
-    async def wrapper():
-        return await asyncio.to_thread(func)
-    return wrapper
-
-@run_fetch_trades
-def fetch_trades():
-    # Configure the Chrome driver
-    options = webdriver.ChromeOptions()
-    options.add_argument('--headless')
-    options.add_experimental_option('excludeSwitches', ['enable-logging'])
-
-    # Create the driver
-    driver = webdriver.Chrome(options=options)
-    try:
-        print(f"[{current_time()}] Trades: Created driver")
-
-        # Fetch the page source
-        driver.get(nba_transactions_url)
-        driver.implicitly_wait(30)
-
-        return driver.page_source
-    except (WebDriverException, TimeoutException) as e:
-        print(f"[{current_time()}] Trades: An error occurred while fetching trades: {str(e)}")
-    finally:
-        # Close the driver
-        driver.quit()
-        print(f"[{current_time()}] Trades: Closed the driver")
-
-async def fetch_and_display_trades_new(client):
-    # New function to get transactions using https://stats.nba.com/js/data/playermovement/NBA_Player_Movement.json
-    # No more selenium!
-    bot.settings["TRANSACTIONS_RUNNING"] = True
 
 async def fetch_and_display_trades(client):
     # Check if debug channel is set
@@ -61,55 +19,49 @@ async def fetch_and_display_trades(client):
 
     bot.settings["TRANSACTIONS_RUNNING"] = True
     try:
-        while os.environ['TRANSACTIONS_ENABLED'] == "True":       
-
-            page_source = await fetch_trades()
-            print(f"[{current_time()}] Trades: Fetched page source")
-
-            # Parse the HTML content
-            soup = BeautifulSoup(page_source, "html.parser")
-            print(f"[{current_time()}] Trades: Parsed page source")
-
-            # Extract player trade information
-            trades = soup.find_all("div", class_="TransactionSingle_base__y2kG1")
+        while os.environ['TRANSACTIONS_ENABLED'] == "True":
+            request = requests.get("https://stats.nba.com/js/data/playermovement/NBA_Player_Movement.json").json()
+            trades = request["NBA_Player_Movement"]["rows"][:50]
             trades.reverse()
 
-            if trades:
-                if len(trades) == 0:
-                    print(f"[{current_time()}] Trades: No trades found")
+            posted_trades_tuples = db.get_all_transactions()
+            posted_trades = [item[0] for item in posted_trades_tuples]
+            skipped = 0
+            added = 0
+
+            # Format and post new trades to Discord
+            for trade in trades:
+                trade_details = trade["TRANSACTION_DESCRIPTION"]
+                trade_image_url = f"https://cdn.nba.com/headshots/nba/latest/260x190/{int(trade['PLAYER_ID'])}.png"
+                
+                # Check player image is available
+                response = requests.get(trade_image_url)
+                content_type = response.headers['content-type'].lower()
+                if content_type == 'image/png':
+                    player_image_url = trade_image_url
                 else:
-                    print(f"[{current_time()}] Trades: Found {len(trades)} trades")
+                    player_image_url = "https://cdn.nba.com/headshots/nba/latest/260x190/fallback.png"
 
-                posted_trades_tuples = db.get_all_transactions()
-                posted_trades = [item[0] for item in posted_trades_tuples]
-                skipped = 0
-                added = 0
+                formatted_trade = discord.Embed(title="New Player Transaction", description=trade_details, color=0xf52f63, timestamp=datetime.now(), url=nba_transactions_url)
+                formatted_trade.set_thumbnail(url=player_image_url)
+                formatted_trade.set_footer(text=f"NBA", icon_url="https://pbs.twimg.com/profile_images/1692188312759341056/Eb9QQok7_200x200.jpg")
 
-                # Format and post new trades to Discord
-                for trade in trades:
-                    trade_details = trade.find("div", class_="TransactionSingle_desc__uG447").text.strip()
-                    player_image = trade.find("img", class_="PlayerImage_image__wH_YX")
-                    player_image_url = player_image['src']
-                    formatted_trade = discord.Embed(title="New Player Transaction", description=trade_details, color=0xf52f63, timestamp=datetime.now(), url=nba_transactions_url)
-                    formatted_trade.set_thumbnail(url=player_image_url)
-                    formatted_trade.set_footer(text=f"NBA", icon_url="https://pbs.twimg.com/profile_images/1692188312759341056/Eb9QQok7_200x200.jpg")
+                # Check if the trade has been posted before
+                if trade_details not in posted_trades:
+                    # Post the trade to Discord
+                    transaction_channel = client.get_channel(bot.settings["TRANSACTION_CHANNEL_ID"])
+                    await transaction_channel.send(embed=formatted_trade)
+                    await asyncio.sleep(1)
 
-                    # Check if the trade has been posted before
-                    if trade_details not in posted_trades:
-                        # Post the trade to Discord
-                        transaction_channel = client.get_channel(bot.settings["TRANSACTION_CHANNEL_ID"])
-                        #await transaction_channel.send(embed=formatted_trade)
-                        await asyncio.sleep(1)
+                    # Add the trade to the list of posted trades
+                    added += 1
+                    db.add_transaction(trade_details)
+                else:
+                    skipped += 1
 
-                        # Add the trade to the list of posted trades
-                        added += 1
-                        db.add_transaction(trade_details)
-                    else:
-                        skipped += 1
-
-                print(f"[{current_time()}] Trades: Skipped " + str(skipped) + ". Added " + str(added) + ".")
-                db.commit()
-
+            print(f"[{current_time()}] Trades: Skipped " + str(skipped) + ". Added " + str(added) + ".")
+            db.commit()
+            
             await asyncio.sleep(600)
 
     except Exception as e:
@@ -122,7 +74,6 @@ async def fetch_and_display_trades(client):
         bot.settings["TRANSACTIONS_ENABLED"] = False
         bot.settings["TRANSACTIONS_RUNNING"] = False
         print(f"[{current_time()}] Trades: fully exited.")
-
 
 async def fetch_and_display_games(client):
     # Check if debug channel is set
