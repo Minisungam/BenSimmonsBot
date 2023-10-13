@@ -126,11 +126,14 @@ async def fetch_and_display_games(client):
 
             # Get the current date from the scoreboard data
             scoreboard_date = datetime.strptime(scoreboard_info["gameDate"], "%Y-%m-%d").date()
+            last_date = datetime.strptime(bot.settings['DAILY_SCORE_LAST_DATE'], "%Y-%m-%d").date()
             
             # Check if the date has changed
-            if str(scoreboard_date) == str(datetime.now().strftime("%Y-%m-%d")):
+            #if str(scoreboard_date) != str(datetime.now().strftime("%Y-%m-%d")):
+            if scoreboard_date != last_date:
                 new_message = True
                 print(f"[{current_time()}] Daily Score: Date has changed. Creating new message.")
+                
 
             embed = discord.Embed(title=f"Scores for {str(scoreboard_date.strftime('%B %dth, %Y'))}", color=0xf52f63)
 
