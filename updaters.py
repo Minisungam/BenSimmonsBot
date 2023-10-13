@@ -1,5 +1,6 @@
 import discord, bot, asyncio, db, os, requests
 from datetime import datetime
+import aiohttp
 
 nba_transactions_url = "https://www.nba.com/players/transactions"
 
@@ -7,6 +8,17 @@ def current_time():
     current_time = datetime.now()
     formatted_time: str = current_time.strftime("%H:%M:%S")
     return formatted_time
+
+async def fetch_image_url(player_id):
+    base_url = "https://cdn.nba.com/headshots/nba/latest/260x190/"
+    player_image_url = f"{base_url}{int(player_id)}.png"
+
+    async with aiohttp.ClientSession() as session:
+        async with session.head(player_image_url) as response:
+            if response.status == 200:
+                return player_image_url
+            else:
+                return f"{base_url}fallback.png"
 
 async def fetch_and_display_trades(client):
     # Check if debug channel is set
@@ -16,6 +28,16 @@ async def fetch_and_display_trades(client):
     except:
         bot.settings["DEBUG_OUTPUT"] = False
         print(f"[{current_time()}] Bot: Debug channel not found. Disabling debug output.")
+
+    # Check if transaction channel is set
+    try:
+        transaction_channel = client.get_channel(bot.settings["TRANSACTION_CHANNEL_ID"])
+    except:
+        print(f"[{current_time()}] Trades: Trades channel not found. Disabling trades.")
+        bot.settings["TRANSACTIONS_ENABLED"] = False
+        bot.settings["TRANSACTIONS_RUNNING"] = False
+        print(f"[{current_time()}] Trades: fully exited.")
+        return
 
     bot.settings["TRANSACTIONS_RUNNING"] = True
     try:
@@ -32,15 +54,7 @@ async def fetch_and_display_trades(client):
             # Format and post new trades to Discord
             for trade in trades:
                 trade_details = trade["TRANSACTION_DESCRIPTION"]
-                trade_image_url = f"https://cdn.nba.com/headshots/nba/latest/260x190/{int(trade['PLAYER_ID'])}.png"
-                
-                # Check player image is available
-                response = requests.get(trade_image_url)
-                content_type = response.headers['content-type'].lower()
-                if content_type == 'image/png':
-                    player_image_url = trade_image_url
-                else:
-                    player_image_url = "https://cdn.nba.com/headshots/nba/latest/260x190/fallback.png"
+                player_image_url = await fetch_image_url(trade['PLAYER_ID'])
 
                 formatted_trade = discord.Embed(title="New Player Transaction", description=trade_details, color=0xf52f63, timestamp=datetime.now(), url=nba_transactions_url)
                 formatted_trade.set_thumbnail(url=player_image_url)
@@ -49,7 +63,7 @@ async def fetch_and_display_trades(client):
                 # Check if the trade has been posted before
                 if trade_details not in posted_trades:
                     # Post the trade to Discord
-                    transaction_channel = client.get_channel(bot.settings["TRANSACTION_CHANNEL_ID"])
+                    
                     await transaction_channel.send(embed=formatted_trade)
                     await asyncio.sleep(1)
 
@@ -84,10 +98,18 @@ async def fetch_and_display_games(client):
         bot.settings["DEBUG_OUTPUT"] = False
         print(f"[{current_time()}] Bot: Debug channel not found. Disabling debug output.")
 
-    bot.settings["DAILY_SCORE_RUNNING"] = True
+    # Check if daily score channel is set
     try:
         daily_score_channel = client.get_channel(bot.settings["DAILY_SCORE_CHANNEL_ID"])
+    except:
+        print(f"[{current_time()}] Daily Score: Daily score channel not found. Disabling daily score.")
+        bot.settings["TRANSACTIONS_ENABLED"] = False
+        bot.settings["TRANSACTIONS_RUNNING"] = False
+        print(f"[{current_time()}] Daily Score: fully exited.")
+        return
 
+    bot.settings["DAILY_SCORE_RUNNING"] = True
+    try:
         while os.environ['DAILY_SCORE_ENABLED'] == "True":
             new_message = False
             # Fetch the last sent message using the message ID
@@ -116,29 +138,45 @@ async def fetch_and_display_games(client):
                 game_info = {
                     "Game ID": game["gameId"],
                     "Game Status": game["gameStatusText"],
-                    "Period": f"{game['period']}",
-                    "Game Status Text": f"{game['gameStatusText']}",
-                    "Time": f"Q{game['period']} {game['gameClock']}",
+                    "Period": game['period'],
+                    "Game Status": game['gameStatus'],
+                    "Game Status Text": game['gameStatusText'],
+                    "Game Clock": game['gameClock'],
                     "Home Team City": game["homeTeam"]["teamCity"],
                     "Home Team Name": game["homeTeam"]["teamName"],
                     "Away Team City": game["awayTeam"]["teamCity"],
                     "Away Team Name": game["awayTeam"]["teamName"],
                     "Home Team Score": game["homeTeam"]["score"],
                     "Away Team Score": game["awayTeam"]["score"],
-                }
+                } 
 
-                if game_info["Period"] == "0":
+                if game_info["Game Status"] == 1:
                     embed.add_field(
                         name=f"**{game_info['Home Team City']} {game_info['Home Team Name']} VS {game_info['Away Team City']} {game_info['Away Team Name']}**\n",
                         value=f"Game starting at: {game_info['Game Status Text']}", 
                         inline=False
                     )
-                else:
+                elif game_info["Game Status"] == 2:
+                    if game_info["Game Clock"] == "":
+                        game_info["Game Clock"] = "PT00M00.00S"
+                    game_info["Game Clock"] = game_info["Game Clock"].replace("PT", "").replace("S", "")
+                    parsed_time = datetime.strptime(game_info["Game Clock"], "%MM%S.%f")
+                    game_info["Game Clock"] = str(datetime.strftime(parsed_time, "%M:%S"))
+
                     embed.add_field(
                     name=f"**{game_info['Home Team City']} {game_info['Home Team Name']} VS {game_info['Away Team City']} {game_info['Away Team Name']}**\n", 
-                    value=f"Time: `{game_info['Time']}`\n{game_info['Home Team Name']}: `{game_info['Home Team Score']}`\n{game_info['Away Team Name']}: `{game_info['Away Team Score']}`", 
+                    value=f"Time: `Q{game_info['Period']} {game_info['Game Clock']}`\n{game_info['Home Team Name']}: `{game_info['Home Team Score']}`\n{game_info['Away Team Name']}: `{game_info['Away Team Score']}`", 
                     inline=False
                     )
+                elif game_info["Game Status"] == 3:
+                    embed.add_field(
+                    name=f"**{game_info['Home Team City']} {game_info['Home Team Name']} VS {game_info['Away Team City']} {game_info['Away Team Name']}**\n", 
+                    value=f"**Final Score**\n{game_info['Home Team Name']}: `{game_info['Home Team Score']}`\n{game_info['Away Team Name']}: `{game_info['Away Team Score']}`", 
+                    inline=False
+                    )
+                else:
+                    pass
+
 
             if new_message:
                 # Send the message to Discord
