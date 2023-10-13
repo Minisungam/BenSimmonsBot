@@ -128,7 +128,7 @@ async def fetch_and_display_games(client):
             scoreboard_date = datetime.strptime(scoreboard_info["gameDate"], "%Y-%m-%d").date()
             
             # Check if the date has changed
-            if str(scoreboard_date) != str(datetime.now().strftime("%Y-%m-%d")):
+            if str(scoreboard_date) == str(datetime.now().strftime("%Y-%m-%d")):
                 new_message = True
                 print(f"[{current_time()}] Daily Score: Date has changed. Creating new message.")
 
