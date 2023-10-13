@@ -150,7 +150,7 @@ async def fetch_and_display_games(client):
                 # Edit the message
                 await last_message_sent.edit(embed=embed)
 
-            await asyncio.sleep(15)  # Update every 15 seconds
+            await asyncio.sleep(60)  # Update every minute
 
     except Exception as e:
         if bot.settings["DEBUG_OUTPUT"]:
