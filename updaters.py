@@ -50,6 +50,7 @@ async def fetch_and_display_trades(client):
                 except:
                     retry_count += 1
                     print(f"[{current_time()}] Trades: Error fetching data. Retry #{retry_count}...")
+                    asyncio.sleep(15)
 
             if retry_count >= 5:
                 print(f"[{current_time()}] Trades: Error fetching data. Skipping...")
