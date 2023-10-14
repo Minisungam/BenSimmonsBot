@@ -77,7 +77,7 @@ async def fetch_and_display_trades(client):
                 if trade_details not in posted_trades:
                     # Post the trade to Discord
                     
-                    await transaction_channel.send(embed=formatted_trade)
+                    #await transaction_channel.send(embed=formatted_trade)
                     await asyncio.sleep(1)
 
                     # Add the trade to the list of posted trades
@@ -156,12 +156,12 @@ async def fetch_and_display_games(client):
                     "Game Status": game["gameStatusText"],
                     "Period": game['period'],
                     "Game Status": game['gameStatus'],
-                    "Game Status Text": game['gameStatusText'],
-                    "Game Clock": game['gameClock'],
-                    "Home Team City": game["homeTeam"]["teamCity"],
-                    "Home Team Name": game["homeTeam"]["teamName"],
-                    "Away Team City": game["awayTeam"]["teamCity"],
-                    "Away Team Name": game["awayTeam"]["teamName"],
+                    "Game Status Text": game['gameStatusText'].strip(),
+                    "Game Clock": game['gameClock'].strip(),
+                    "Home Team City": game["homeTeam"]["teamCity"].strip(),
+                    "Home Team Name": game["homeTeam"]["teamName"].strip(),
+                    "Away Team City": game["awayTeam"]["teamCity"].strip(),
+                    "Away Team Name": game["awayTeam"]["teamName"].strip(),
                     "Home Team Score": game["homeTeam"]["score"],
                     "Away Team Score": game["awayTeam"]["score"],
                 } 
@@ -174,11 +174,15 @@ async def fetch_and_display_games(client):
                         inline=False
                     )
                 elif game_info["Game Status"] == 2:
+                    # Format the game clock
                     if game_info["Game Clock"] == "":
                         game_info["Game Clock"] = "PT00M00.00S"
-                    game_info["Game Clock"] = game_info["Game Clock"].replace("PT", "").replace("S", "")
-                    parsed_time = datetime.strptime(game_info["Game Clock"], "%MM%S.%f")
-                    game_info["Game Clock"] = str(datetime.strftime(parsed_time, "%M:%S"))
+                    elif ":" in game_info["Game Clock"]:
+                        pass
+                    else:
+                        game_info["Game Clock"] = game_info["Game Clock"].replace("PT", "").replace("S", "")
+                        parsed_time = datetime.strptime(game_info["Game Clock"], "%MM%S.%f")
+                        game_info["Game Clock"] = str(datetime.strftime(parsed_time, "%M:%S"))
 
                     embed.add_field(
                     name=f"**{game_info['Home Team City']} {game_info['Home Team Name']} VS {game_info['Away Team City']} {game_info['Away Team Name']}**\n", 
