@@ -42,7 +42,19 @@ async def fetch_and_display_trades(client):
     bot.settings["TRANSACTIONS_RUNNING"] = True
     try:
         while os.environ['TRANSACTIONS_ENABLED'] == "True":
-            request = requests.get("https://stats.nba.com/js/data/playermovement/NBA_Player_Movement.json").json()
+            retry_count = 0
+            while retry_count < 5:
+                try:
+                    request = requests.get("https://stats.nba.com/js/data/playermovement/NBA_Player_Movement.json").json()
+                    break
+                except:
+                    retry_count += 1
+                    print(f"[{current_time()}] Trades: Error fetching data. Retry #{retry_count}...")
+
+            if retry_count >= 5:
+                print(f"[{current_time()}] Trades: Error fetching data. Skipping...")
+                return
+                
             trades = request["NBA_Player_Movement"]["rows"][:50]
             trades.reverse()
 
@@ -129,14 +141,14 @@ async def fetch_and_display_games(client):
             last_date = datetime.strptime(bot.settings['DAILY_SCORE_LAST_DATE'], "%Y-%m-%d").date()
             
             # Check if the date has changed
-            #if str(scoreboard_date) != str(datetime.now().strftime("%Y-%m-%d")):
             if scoreboard_date != last_date:
                 new_message = True
                 print(f"[{current_time()}] Daily Score: Date has changed. Creating new message.")
-                
 
+            # Create the embed
             embed = discord.Embed(title=f"Scores for {str(scoreboard_date.strftime('%B %dth, %Y'))}", color=0xf52f63)
 
+            # Add the games to the embed
             for game in games:
                 game_info = {
                     "Game ID": game["gameId"],
@@ -153,6 +165,7 @@ async def fetch_and_display_games(client):
                     "Away Team Score": game["awayTeam"]["score"],
                 } 
 
+                # Game Status: 1 = Pre-Game, 2 = In-Progress, 3 = Final
                 if game_info["Game Status"] == 1:
                     embed.add_field(
                         name=f"**{game_info['Home Team City']} {game_info['Home Team Name']} VS {game_info['Away Team City']} {game_info['Away Team Name']}**\n",
@@ -180,15 +193,14 @@ async def fetch_and_display_games(client):
                 else:
                     pass
 
-
             if new_message:
                 # Send the message to Discord
                 await daily_score_channel.send(embed=embed)
                 bot.settings['DAILY_SCORE_LAST_MESSAGE_ID'] = daily_score_channel.last_message_id
-                bot.settings['DAILY_SCORE_LAST_DATE'] = datetime.now().strftime("%Y-%m-%d")
+                bot.settings['DAILY_SCORE_LAST_DATE'] = str(scoreboard_date)
                 bot.update_env_file()
             else:
-                # Edit the message
+                # Edit the last message
                 await last_message_sent.edit(embed=embed)
 
             await asyncio.sleep(60)  # Update every minute

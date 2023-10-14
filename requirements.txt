@@ -5,3 +5,4 @@ python-dotenv==1.0.0
 pandas==1.4.4
 asyncpraw==7.7.1
 asyncio==3.4.3
+aiohttp==3.8.6
