@@ -77,7 +77,7 @@ async def fetch_and_display_trades(client):
                 if trade_details not in posted_trades:
                     # Post the trade to Discord
                     
-                    #await transaction_channel.send(embed=formatted_trade)
+                    await transaction_channel.send(embed=formatted_trade)
                     await asyncio.sleep(1)
 
                     # Add the trade to the list of posted trades
