@@ -61,21 +61,20 @@ async def fetch_and_display_trades(client):
 
             posted_trades_tuples = db.get_all_transactions()
             posted_trades = [item[0] for item in posted_trades_tuples]
-            skipped = 0
             added = 0
 
             # Format and post new trades to Discord
             for trade in trades:
                 trade_details = trade["TRANSACTION_DESCRIPTION"]
-                player_image_url = await fetch_image_url(trade['PLAYER_ID'])
-
-                formatted_trade = discord.Embed(title="New Player Transaction", description=trade_details, color=0xf52f63, timestamp=datetime.now(), url=nba_transactions_url)
-                formatted_trade.set_thumbnail(url=player_image_url)
-                formatted_trade.set_footer(text=f"NBA", icon_url="https://pbs.twimg.com/profile_images/1692188312759341056/Eb9QQok7_200x200.jpg")
-
+                
                 # Check if the trade has been posted before
                 if trade_details not in posted_trades:
                     # Post the trade to Discord
+                    player_image_url = await fetch_image_url(trade['PLAYER_ID'])  
+
+                    formatted_trade = discord.Embed(title="New Player Transaction", description=trade_details, color=0xf52f63, timestamp=datetime.now(), url=nba_transactions_url)
+                    formatted_trade.set_thumbnail(url=player_image_url)
+                    formatted_trade.set_footer(text=f"NBA", icon_url="https://pbs.twimg.com/profile_images/1692188312759341056/Eb9QQok7_200x200.jpg")
                     
                     await transaction_channel.send(embed=formatted_trade)
                     await asyncio.sleep(1)
@@ -83,10 +82,9 @@ async def fetch_and_display_trades(client):
                     # Add the trade to the list of posted trades
                     added += 1
                     db.add_transaction(trade_details)
-                else:
-                    skipped += 1
 
-            print(f"[{current_time()}] Trades: Skipped " + str(skipped) + ". Added " + str(added) + ".")
+            if added > 0:
+                print(f"[{current_time()}] Trades: Added " + str(added) + " trades.")
             db.commit()
             
             await asyncio.sleep(600)
