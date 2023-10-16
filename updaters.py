@@ -50,10 +50,10 @@ async def fetch_and_display_trades(client):
                 except:
                     retry_count += 1
                     print(f"[{current_time()}] Trades: Error fetching data. Retry #{retry_count}...")
-                    asyncio.sleep(15)
+                    await asyncio.sleep(15)
 
             if retry_count >= 5:
-                print(f"[{current_time()}] Trades: Error fetching data. Skipping...")
+                print(f"[{current_time()}] Trades: Error fetching data.")
                 return
                 
             trades = request["NBA_Player_Movement"]["rows"][:50]
@@ -130,8 +130,21 @@ async def fetch_and_display_games(client):
                 last_message_sent = None
                 new_message = True
                 print(f"[{current_time()}] Daily Score: Message not found. Creating new message.")
+            
+            retry_count = 0
+            while retry_count < 5:
+                try:
+                    todaysScoreboard = requests.get("https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json").json()
+                    break
+                except:
+                    retry_count += 1
+                    print(f"[{current_time()}] Daily Score: Error fetching data. Retry #{retry_count}...")
+                    await asyncio.sleep(15)
 
-            todaysScoreboard = requests.get("https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json").json()
+            if retry_count >= 5:
+                print(f"[{current_time()}] Daily Score: Error fetching data.")
+                return
+            
             scoreboard_info = todaysScoreboard["scoreboard"]
             games = scoreboard_info["games"]
 
