@@ -1,4 +1,4 @@
-import discord, bot, asyncio, db, os, requests
+import discord, bot, asyncio, db, os
 from datetime import datetime
 import aiohttp
 
@@ -19,6 +19,14 @@ async def fetch_image_url(player_id):
                 return player_image_url
             else:
                 return f"{base_url}fallback.png"
+            
+async def fetch_json(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 200:
+                return await response.json()
+            else:
+                raise ValueError(f"Failed to fetch JSON from {url}. Status code: {response.status}")
 
 async def fetch_and_display_trades(client):
     # Check if debug channel is set
@@ -45,7 +53,7 @@ async def fetch_and_display_trades(client):
             retry_count = 0
             while retry_count < 5:
                 try:
-                    request = requests.get("https://stats.nba.com/js/data/playermovement/NBA_Player_Movement.json").json()
+                    request = await fetch_json("https://stats.nba.com/js/data/playermovement/NBA_Player_Movement.json")
                     break
                 except:
                     retry_count += 1
@@ -134,7 +142,7 @@ async def fetch_and_display_games(client):
             retry_count = 0
             while retry_count < 5:
                 try:
-                    todaysScoreboard = requests.get("https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json").json()
+                    todaysScoreboard = await fetch_json("https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json")
                     break
                 except:
                     retry_count += 1
