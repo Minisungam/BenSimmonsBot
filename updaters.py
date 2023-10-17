@@ -1,4 +1,4 @@
-import discord, bot, asyncio, db, os
+import discord, bot, asyncio, db, os, json
 from datetime import datetime
 import aiohttp
 
@@ -20,13 +20,18 @@ async def fetch_image_url(player_id):
             else:
                 return f"{base_url}fallback.png"
             
+
 async def fetch_json(url):
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
-            if response.status == 200 or 304:
-                return await response.json()
+            if response.status == 200:
+                data = await response.text()
+                try:
+                    return json.loads(data)
+                except json.JSONDecodeError:
+                    raise ValueError(f"Failed to decode data from {url}. It does not contain valid JSON data.")
             else:
-                raise ValueError(f"Failed to fetch JSON from {url}. Status code: {response.status}")
+                raise ValueError(f"Failed to fetch data from {url}. Status code: {response.status}")
 
 async def fetch_and_display_trades(client):
     # Check if debug channel is set
@@ -55,9 +60,10 @@ async def fetch_and_display_trades(client):
                 try:
                     request = await fetch_json("https://stats.nba.com/js/data/playermovement/NBA_Player_Movement.json")
                     break
-                except:
+                except Exception as e:
                     retry_count += 1
                     print(f"[{current_time()}] Trades: Error fetching data. Retry #{retry_count}...")
+                    print(f"[{current_time()}] {str(e)}")
                     await asyncio.sleep(15)
 
             if retry_count >= 5:
@@ -92,7 +98,7 @@ async def fetch_and_display_trades(client):
                     db.add_transaction(trade_details)
 
             if added > 0:
-                print(f"[{current_time()}] Trades: Added " + str(added) + " trades.")
+                print(f"[{current_time()}] Trades: Found new trades. Added " + str(added) + " trades.")
             db.commit()
             
             await asyncio.sleep(600)
@@ -144,9 +150,10 @@ async def fetch_and_display_games(client):
                 try:
                     todaysScoreboard = await fetch_json("https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json")
                     break
-                except:
+                except Exception as e:
                     retry_count += 1
                     print(f"[{current_time()}] Daily Score: Error fetching data. Retry #{retry_count}...")
+                    print(f"[{current_time()}] {str(e)}")
                     await asyncio.sleep(15)
 
             if retry_count >= 5:
