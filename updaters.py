@@ -23,7 +23,7 @@ async def fetch_image_url(player_id):
 async def fetch_json(url):
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
-            if response.status == 200:
+            if response.status == 200 or 304:
                 return await response.json()
             else:
                 raise ValueError(f"Failed to fetch JSON from {url}. Status code: {response.status}")
