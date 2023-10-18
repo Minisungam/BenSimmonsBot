@@ -16,9 +16,9 @@ Only the user id specified in ".env" can do the following:
 - [x] /daily_scores - Allows the user to enable or disable the daily scores service.
 - [x] /set_channels - Allows the user to choose channels to display updates from within Discord.
 
-### Recursive Functions
+### Services
 - [x] Transactions - Will pull player transaction data from NBA.com and puts it into the selected channel.
-- [ ] Daily Scores - Displays the current day's games and their scores, and keeps the message up to date. (UNTESTED)
+- [x] Daily Scores - Displays the current day's games and their scores, and keeps the message up to date.
 
 ### Chat Commands
 - [x] !help - Displays a list of chat commands.
