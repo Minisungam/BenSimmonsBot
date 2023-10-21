@@ -154,7 +154,7 @@ async def fetch_and_display_games(client):
                     retry_count += 1
                     print(f"[{current_time()}] Daily Score: Error fetching data. Retry #{retry_count}...")
                     print(f"[{current_time()}] {str(e)}")
-                    await asyncio.sleep(15)
+                    await asyncio.sleep(30)
 
             if retry_count >= 5:
                 print(f"[{current_time()}] Daily Score: Error fetching data.")
@@ -223,7 +223,16 @@ async def fetch_and_display_games(client):
                     )
                 else:
                     pass
-
+                    
+            # Add a message if there are no games today
+            if len(games) == 0:
+                embed.add_field(
+                    name="No games today.",
+                    value="Check back tomorrow!",
+                    inline=False
+                )        
+            
+            # Send new message or edit the last message
             if new_message:
                 # Send the message to Discord
                 await daily_score_channel.send(embed=embed)
