@@ -1,6 +1,7 @@
 import discord, bot, asyncio, db, os, json
 from datetime import datetime
 import aiohttp
+import sqlite3
 
 nba_transactions_url = "https://www.nba.com/players/transactions"
 
@@ -99,13 +100,20 @@ async def fetch_and_display_trades(client):
                     await asyncio.sleep(1)
 
                     # Add the trade to the list of posted trades
-                    added += 1
-                    db.add_transaction(trade_details)
+                    try:
+                        db.add_transaction(trade_details)
+                        posted_trades.add(trade_details)
+                        added += 1
+                    except sqlite3.IntegrityError as e:
+                        print(f"[{current_time()}] Trades: Error adding trade to database.")
+                        print(f"[{current_time()}] {str(e)}")
+                        if bot.settings["DEBUG_OUTPUT"]:
+                            await debug_channel.send(f"Trades error: ```{str(e)}```")
 
             if added > 0:
                 print(f"[{current_time()}] Trades: Found new trades. Added " + str(added) + " trades.")
+
             db.commit()
-            
             await asyncio.sleep(600)
 
     except Exception as e:
