@@ -9,6 +9,12 @@ def current_time():
     formatted_time: str = current_time.strftime("%H:%M:%S")
     return formatted_time
 
+def get_wait_time(retry_count):
+    wait_times = [5, 10, 15, 30, 60, 120, 180, 300, 600, 900, 1800, 3600]
+    
+    # Use the last wait time for all subsequent retries if retry_count exceeds the list length
+    return wait_times[min(retry_count, len(wait_times) - 1)]
+
 async def fetch_image_url(player_id):
     base_url = "https://cdn.nba.com/headshots/nba/latest/260x190/"
     player_image_url = f"{base_url}{int(player_id)}.png"
@@ -18,8 +24,7 @@ async def fetch_image_url(player_id):
             if response.status == 200:
                 return player_image_url
             else:
-                return f"{base_url}fallback.png"
-            
+                return f"{base_url}fallback.png"   
 
 async def fetch_json(url):
     async with aiohttp.ClientSession() as session:
@@ -56,17 +61,17 @@ async def fetch_and_display_trades(client):
     try:
         while os.environ['TRANSACTIONS_ENABLED'] == "True":
             retry_count = 0
-            while retry_count < 5:
+            while retry_count < 13:
                 try:
                     request = await fetch_json("https://stats.nba.com/js/data/playermovement/NBA_Player_Movement.json")
                     break
                 except Exception as e:
-                    retry_count += 1
                     print(f"[{current_time()}] Trades: Error fetching data. Retry #{retry_count}...")
                     print(f"[{current_time()}] {str(e)}")
-                    await asyncio.sleep(15)
+                    await asyncio.sleep(get_wait_time(retry_count))
+                    retry_count += 1
 
-            if retry_count >= 5:
+            if retry_count >= 13:
                 print(f"[{current_time()}] Trades: Error fetching data.")
                 return
                 
@@ -146,17 +151,17 @@ async def fetch_and_display_games(client):
                 print(f"[{current_time()}] Daily Score: Message not found. Creating new message.")
             
             retry_count = 0
-            while retry_count < 5:
+            while retry_count < 13:
                 try:
                     todaysScoreboard = await fetch_json("https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json")
                     break
                 except Exception as e:
-                    retry_count += 1
                     print(f"[{current_time()}] Daily Score: Error fetching data. Retry #{retry_count}...")
                     print(f"[{current_time()}] {str(e)}")
-                    await asyncio.sleep(30)
+                    await asyncio.sleep(get_wait_time(retry_count))
+                    retry_count += 1
 
-            if retry_count >= 5:
+            if retry_count >= 13:
                 print(f"[{current_time()}] Daily Score: Error fetching data.")
                 return
             
