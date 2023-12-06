@@ -13,6 +13,20 @@ import dotenv
 from nba_api.stats.static import players
 from nba_api.stats.endpoints import playercareerstats, playergamelog, commonplayerinfo, LeagueLeaders
 
+program_name = "BenSimmonsBot"
+version = "v1.0.1"
+
+graphic = f"""
+
+   ___           _____                           ___       __ 
+  / _ )___ ___  / __(_)_ _  __ _  ___  ___  ___ / _ )___  / /_
+ / _  / -_) _ \_\ \/ /  ' \/  ' \/ _ \/ _ \(_-</ _  / _ \/ __/
+/____/\__/_//_/___/_/_/_/_/_/_/_/\___/_//_/___/____/\___/\__/ 
+                                                                               
+Program: {program_name}
+Version: {version}
+"""
+
 settings = {
     "BOT_TOKEN": "",
     "GUILD_ID": 0,
@@ -112,6 +126,8 @@ def run_discord_bot():
     async def on_ready():
         global transactions_service
         global daily_scores_service
+
+        print(graphic)
 
         print(f'{client.user} has connected to Discord!')
         # Daily Scores
