@@ -176,8 +176,7 @@ async def fetch_and_display_games(client):
             suffix = "th" if 11 <= scoreboard_date.day <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(scoreboard_date.day % 10, 'th')
             day_formatted = str(scoreboard_date.day).lstrip('0') if scoreboard_date.day < 10 else str(scoreboard_date.day)
             embed_title = f"Scores for {str(scoreboard_date.strftime('%B ' + day_formatted + suffix + ', %Y'))}"
-            print(f"[{current_time()}] Daily Score: Date: {embed_title}")
-
+        
             # Get the last message sent in the channel
             latest_message = [message async for message in daily_score_channel.history(limit=1)]
             last_message_sent = latest_message[0]
