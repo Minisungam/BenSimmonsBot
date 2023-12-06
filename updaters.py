@@ -128,8 +128,10 @@ async def fetch_and_display_trades(client):
         print(f"[{current_time()}] Trades: fully exited.")
 
 async def fetch_and_display_games(client):
-    # Check if debug channel is set
     debug_channel = None
+    daily_score_channel = None
+
+    # Check if debug channel is set
     try:
         debug_channel = client.get_channel(bot.settings["DEBUG_CHANNEL_ID"])
     except:
@@ -150,13 +152,6 @@ async def fetch_and_display_games(client):
     try:
         while os.environ['DAILY_SCORE_ENABLED'] == "True":
             new_message = False
-            # Fetch the last sent message using the message ID
-            try:
-                last_message_sent = await daily_score_channel.fetch_message(bot.settings['DAILY_SCORE_LAST_MESSAGE_ID'])
-            except:
-                last_message_sent = None
-                new_message = True
-                print(f"[{current_time()}] Daily Score: Message not found. Creating new message.")
             
             retry_count = 0
             while retry_count < 13:
@@ -165,7 +160,7 @@ async def fetch_and_display_games(client):
                     break
                 except Exception as e:
                     print(f"[{current_time()}] Daily Score: Error fetching data. Retry #{retry_count}...")
-                    print(f"[{current_time()}] {str(e)}")
+                    print(f"[{current_time()}] Error: {str(e)}")
                     await asyncio.sleep(get_wait_time(retry_count))
                     retry_count += 1
 
@@ -178,15 +173,27 @@ async def fetch_and_display_games(client):
 
             # Get the current date from the scoreboard data
             scoreboard_date = datetime.strptime(scoreboard_info["gameDate"], "%Y-%m-%d").date()
-            last_date = datetime.strptime(bot.settings['DAILY_SCORE_LAST_DATE'], "%Y-%m-%d").date()
-            
-            # Check if the date has changed
-            if scoreboard_date != last_date:
+            suffix = "th" if 11 <= scoreboard_date.day <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(scoreboard_date.day % 10, 'th')
+            day_formatted = str(scoreboard_date.day).lstrip('0') if scoreboard_date.day < 10 else str(scoreboard_date.day)
+            embed_title = f"Scores for {str(scoreboard_date.strftime('%B ' + day_formatted + suffix + ', %Y'))}"
+            print(f"[{current_time()}] Daily Score: Date: {embed_title}")
+
+            # Get the last message sent in the channel
+            latest_message = [message async for message in daily_score_channel.history(limit=1)]
+            last_message_sent = latest_message[0]
+
+            # Abort if the last message sent is not found for whatever reason
+            if last_message_sent is None:
+                raise Exception("Last message sent not found.")
+
+            # Compare the title of the last message sent to the current title
+            latest_message_embed = latest_message[0].embeds[0]
+            if latest_message_embed.title != embed_title:
                 new_message = True
                 print(f"[{current_time()}] Daily Score: Date has changed. Creating new message.")
 
             # Create the embed
-            embed = discord.Embed(title=f"Scores for {str(scoreboard_date.strftime('%B %dth, %Y'))}", color=0xf52f63)
+            embed = discord.Embed(title=embed_title, color=0xf52f63)
 
             # Add the games to the embed
             for game in games:
@@ -249,12 +256,10 @@ async def fetch_and_display_games(client):
             if new_message:
                 # Send the message to Discord
                 await daily_score_channel.send(embed=embed)
-                bot.settings['DAILY_SCORE_LAST_MESSAGE_ID'] = daily_score_channel.last_message_id
-                bot.settings['DAILY_SCORE_LAST_DATE'] = str(scoreboard_date)
-                bot.update_env_file()
             else:
                 # Edit the last message
                 await last_message_sent.edit(embed=embed)
+
 
             await asyncio.sleep(60)  # Update every minute
 

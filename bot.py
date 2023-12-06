@@ -23,8 +23,6 @@ settings = {
     "DEBUG_OUTPUT": False,
     "DAILY_SCORE_ENABLED": False,
     "DAILY_SCORE_RUNNING": False,
-    "DAILY_SCORE_LAST_MESSAGE_ID": 0,
-    "DAILY_SCORE_LAST_DATE": "",
     "TRANSACTIONS_ENABLED": False,
     "TRANSACTIONS_RUNNING": False,
     "REDDIT_BOT_ID": "",
@@ -62,9 +60,7 @@ def update_env_file():
     dotenv.set_key(dotenv_file, "DAILY_SCORE_CHANNEL_ID", str(settings["DAILY_SCORE_CHANNEL_ID"]))
     dotenv.set_key(dotenv_file, "DEBUG_CHANNEL_ID", str(settings["DEBUG_CHANNEL_ID"]))
     dotenv.set_key(dotenv_file, "DEBUG_OUTPUT", str(settings["DEBUG_OUTPUT"]))
-    dotenv.set_key(dotenv_file, "DAILY_SCORE_LAST_MESSAGE_ID", str(settings["DAILY_SCORE_LAST_MESSAGE_ID"]))
     dotenv.set_key(dotenv_file, "DAILY_SCORE_ENABLED", str(settings["DAILY_SCORE_ENABLED"]))
-    dotenv.set_key(dotenv_file, "DAILY_SCORE_LAST_DATE", str(settings["DAILY_SCORE_LAST_DATE"]))
     dotenv.set_key(dotenv_file, "TRANSACTIONS_ENABLED", str(settings["TRANSACTIONS_ENABLED"]))
 
 # Discord bot main functionality
@@ -85,8 +81,6 @@ def run_discord_bot():
         settings["DAILY_SCORE_CHANNEL_ID"]: int = int(os.getenv('DAILY_SCORE_CHANNEL_ID'))
         settings["DEBUG_CHANNEL_ID"]: int = int(os.getenv('DEBUG_CHANNEL_ID'))
         settings["DEBUG_OUTPUT"]: bool = eval(os.getenv('DEBUG_OUTPUT'))
-        settings["DAILY_SCORE_LAST_MESSAGE_ID"]: int = int(os.getenv('DAILY_SCORE_LAST_MESSAGE_ID'))
-        settings["DAILY_SCORE_LAST_DATE"]: str = os.getenv('DAILY_SCORE_LAST_DATE')
     except:
         print(f"[{current_time()}] Bot: Environment variables missing in .env file.")
         return
@@ -429,22 +423,18 @@ def run_discord_bot():
                 settings["DAILY_SCORE_ENABLED"] = True
                 dotenv.set_key(dotenv_file, "DAILY_SCORE_ENABLED", "True")
                 client.loop.create_task(fetch_and_display_games(client))
-                print(f"[{current_time()}] Bot: Daily scores service started")
                 return("Daily scores service started")
             else:
                 return("Daily scores service was recently shut down, please try again in a few minutes")
         else:
-            print(f"[{current_time()}] Bot: Daily scores service already running")
             return("Daily scores service already running")
             
     async def stop_update_scores():
         if settings["DAILY_SCORE_ENABLED"] is True:
             settings["DAILY_SCORE_ENABLED"] = False
             dotenv.set_key(dotenv_file, "DAILY_SCORE_ENABLED", "False")
-            print(f"[{current_time()}] Bot: Daily scores service stopped")
             return("Daily scores service stopped")
         else:
-            print(f"[{current_time()}] Bot: Daily scores service already stopped")
             return("Daily scores service already stopped")
 
     async def start_update_trades():
@@ -453,22 +443,18 @@ def run_discord_bot():
                 settings["TRANSACTIONS_ENABLED"] = True
                 dotenv.set_key(dotenv_file, "TRANSACTIONS_ENABLED", "True")
                 client.loop.create_task(fetch_and_display_trades(client))
-                print(f"[{current_time()}] Bot: Transactions service started")
                 return("Transactions service started")
             else:
                 return("Transactions service was recently shut down, please try again in a few minutes")
         else:
-            print(f"[{current_time()}] Bot: Transactions service already running")
             return("Transactions service already running")
 
     async def stop_update_trades():
         if settings["TRANSACTIONS_ENABLED"] is True:
             settings["TRANSACTIONS_ENABLED"] = False
             dotenv.set_key(dotenv_file, "TRANSACTIONS_ENABLED", "False")
-            print(f"[{current_time()}] Bot: Transactions service stopped")
             return("Transactions service stopped")
         else:
-            print(f"[{current_time()}] Bot: Transactions service already stopped")
             return("Transactions service already stopped")
         
     client.run(settings["BOT_TOKEN"])
