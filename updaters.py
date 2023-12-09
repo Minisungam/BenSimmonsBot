@@ -102,7 +102,7 @@ async def fetch_and_display_trades(client):
                     # Add the trade to the list of posted trades
                     try:
                         db.add_transaction(trade_details)
-                        posted_trades.add(trade_details)
+                        posted_trades.append(trade_details)
                         added += 1
                     except sqlite3.IntegrityError as e:
                         print(f"[{current_time()}] Trades: Error adding trade to database.")
