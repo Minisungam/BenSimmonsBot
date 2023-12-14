@@ -42,7 +42,9 @@ async def fetch_json(url):
 async def fetch_and_display_trades(client):
     # Prevent multiple instances of the service from running
     if (bot.settings["TRANSACTIONS_RUNNING"] == True):
-        return;
+        print(f"[{current_time()}] Trades: Service was attempted to be started while already running.")
+        return
+
 
     # Check if debug channel is set
     debug_channel = None
@@ -134,7 +136,8 @@ async def fetch_and_display_trades(client):
 async def fetch_and_display_games(client):
     # Prevent multiple instances of the service from running
     if (bot.settings["DAILY_SCORE_RUNNING"] == True):
-        return;
+        print(f"[{current_time()}] Daily Score: Service was attempted to be started while already running.")
+        return
 
     debug_channel = None
     daily_score_channel = None
