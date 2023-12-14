@@ -40,6 +40,10 @@ async def fetch_json(url):
                 raise ValueError(f"Failed to fetch data from {url}. Status code: {response.status}")
 
 async def fetch_and_display_trades(client):
+    # Prevent multiple instances of the service from running
+    if (bot.settings["TRANSACTIONS_RUNNING"] == True):
+        return;
+
     # Check if debug channel is set
     debug_channel = None
     try:
@@ -128,6 +132,10 @@ async def fetch_and_display_trades(client):
         print(f"[{current_time()}] Trades: fully exited.")
 
 async def fetch_and_display_games(client):
+    # Prevent multiple instances of the service from running
+    if (bot.settings["DAILY_SCORE_RUNNING"] == True):
+        return;
+
     debug_channel = None
     daily_score_channel = None
 
