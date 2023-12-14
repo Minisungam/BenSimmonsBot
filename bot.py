@@ -14,7 +14,7 @@ from nba_api.stats.static import players
 from nba_api.stats.endpoints import playercareerstats, playergamelog, commonplayerinfo, LeagueLeaders
 
 program_name = "BenSimmonsBot"
-version = "v1.0.1"
+version = "v1.0.2"
 
 graphic = f"""
 
